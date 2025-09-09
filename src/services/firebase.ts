@@ -270,6 +270,26 @@ export class VideosService {
       throw error;
     }
   }
+
+  async deleteComment(videoId: string, commentId: string): Promise<void> {
+    try {
+      const commentRef = ref(database, `${this.basePath}/${videoId}/comments/${commentId}`);
+      await remove(commentRef);
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      throw error;
+    }
+  }
+
+  async updateComment(videoId: string, commentId: string, updates: any): Promise<void> {
+    try {
+      const commentRef = ref(database, `${this.basePath}/${videoId}/comments/${commentId}`);
+      await update(commentRef, updates);
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      throw error;
+    }
+  }
 }
 
 // Users Service

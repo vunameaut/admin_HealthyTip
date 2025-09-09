@@ -58,6 +58,8 @@ export interface ShortVideo {
   videoUrl: string;
   thumbnailUrl: string;
   cloudinaryPublicId?: string; // For Cloudinary integration
+  cldPublicId?: string; // Alternative naming for Cloudinary public ID
+  thumb?: string; // Thumbnail URL from data
   categoryId: string;
   tags?: Record<string, boolean>;
   viewCount: number;
@@ -68,6 +70,19 @@ export interface ShortVideo {
   width?: number; // Video dimensions
   height?: number;
   updatedAt?: number; // Add this field
+  comments?: Record<string, VideoComment>; // Comments collection
+}
+
+export interface VideoComment {
+  userId: string;
+  username: string;
+  userAvatar?: string;
+  content: string;
+  timestamp: number;
+  likes?: number;
+  replies?: Record<string, VideoComment>;
+  isReported?: boolean;
+  reportReason?: string;
 }
 
 export interface Reminder {

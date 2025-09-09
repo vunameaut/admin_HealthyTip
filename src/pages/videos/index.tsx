@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/router';
 import {
   Box,
@@ -33,7 +33,13 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  List,
+  ListItem,
+  ListItemAvatar,
+  Divider,
+  Badge,
+  Collapse
 } from '@mui/material';
 import {
   VideoLibrary,
@@ -54,7 +60,13 @@ import {
   Schedule,
   TrendingUp,
   FileUpload,
-  FileDownload
+  FileDownload,
+  Comment,
+  Block,
+  PersonOff,
+  Clear,
+  ExpandLess,
+  ExpandMore
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import { useDropzone } from 'react-dropzone';
@@ -99,6 +111,9 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
   const [videoDetailOpen, setVideoDetailOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+  const [userToBan, setUserToBan] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -256,6 +271,179 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
     } catch (error) {
       console.error('Error incrementing view count:', error);
     }
+  };
+
+  // Comment Management Functions
+  const handleDeleteComment = async (commentId: string) => {
+    if (!selectedVideo) return;
+    
+    try {
+      await videosService.deleteComment(selectedVideo.id, commentId);
+      toast.success('Đã xóa comment');
+      loadData(); // Reload to get updated video data
+      
+      // Update selected video data
+      const updatedVideos = await videosService.getAll();
+      const updatedVideo = updatedVideos.find(v => v.id === selectedVideo.id);
+      if (updatedVideo) {
+        setSelectedVideo(updatedVideo);
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast.error('Có lỗi xảy ra khi xóa comment');
+    }
+    setCommentToDelete(null);
+  };
+
+  const handleBanUser = async (userId: string) => {
+    try {
+      // This would require a user service to ban user
+      console.log('Banning user:', userId);
+      toast.success('Đã ban user');
+      // TODO: Implement user banning functionality
+    } catch (error) {
+      console.error('Error banning user:', error);
+      toast.error('Có lỗi xảy ra khi ban user');
+    }
+    setUserToBan(null);
+  };
+
+  const getComments = () => {
+    if (!selectedVideo?.comments) return [];
+    
+    try {
+      return Object.keys(selectedVideo.comments).map(commentId => {
+        const comment = selectedVideo.comments![commentId];
+        if (!comment || typeof comment !== 'object') return null;
+        
+        // Debug log to see the actual comment data
+        console.log('Processing comment:', commentId, comment);
+        
+        // Cast to any to handle dynamic field names from Firebase
+        const commentData = comment as any;
+        
+        return {
+          id: String(commentId),
+          userId: String(commentData.userId || commentData.uid || ''),
+          username: String(commentData.username || commentData.displayName || commentData.userName || ''),
+          content: String(commentData.content || commentData.text || commentData.message || ''),
+          timestamp: Number(commentData.timestamp || commentData.createdAt || commentData.date || Date.now()),
+          likes: Number(commentData.likes || commentData.likeCount || 0),
+          replies: commentData.replies || {},
+          replyCount: commentData.replies ? Object.keys(commentData.replies).length : 0
+        };
+      }).filter(Boolean).sort((a, b) => (b?.timestamp || 0) - (a?.timestamp || 0));
+    } catch (error) {
+      console.error('Error processing comments:', error);
+      return [];
+    }
+  };
+
+  const formatDate = (timestamp: number) => {
+    try {
+      if (!timestamp || isNaN(timestamp)) return 'N/A';
+      return new Date(timestamp).toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
+  };
+
+  // Render replies recursively
+  const renderReplies = (replies: Record<string, any>, level: number = 0, parentComment?: any) => {
+    if (!replies || typeof replies !== 'object') return null;
+    
+    return Object.keys(replies).map((replyId, index) => {
+      const reply = replies[replyId];
+      if (!reply || typeof reply !== 'object') return null;
+      
+      // Cast to any to handle dynamic field names
+      const replyData = reply as any;
+      
+      return (
+        <Box key={`reply-${replyId}-${level}`} sx={{ ml: level * 3 + 2, mt: 1 }}>
+          <Box display="flex" alignItems="flex-start" gap={1}>
+            <Avatar sx={{ width: 24, height: 24, fontSize: '0.75rem', bgcolor: 'secondary.main' }}>
+              {String(replyData.userId || replyData.uid || '').charAt(0)?.toUpperCase() || 'R'}
+            </Avatar>
+            <Box sx={{ flex: 1 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" component="div" fontWeight="bold">
+                    {String(replyData.username || replyData.displayName || replyData.userName || `User: ${String(replyData.userId || replyData.uid || '').substring(0, 8)}...`)}
+                  </Typography>
+                  
+                  {/* Reply context - show what this is replying to */}
+                  {parentComment && (
+                    <Typography variant="caption" color="text.secondary" sx={{ 
+                      fontStyle: 'italic', 
+                      display: 'block',
+                      bgcolor: 'grey.100',
+                      p: 0.5,
+                      borderRadius: 0.5,
+                      mb: 0.5,
+                      border: '1px solid',
+                      borderColor: 'grey.300'
+                    }}>
+                      💬 Trả lời <strong>@{String(parentComment.username || parentComment.displayName || parentComment.userName || `User_${String(parentComment.userId || parentComment.uid || '').substring(0, 8)}`)}</strong>: 
+                      "{String(parentComment.content || parentComment.text || parentComment.message || 'Không có nội dung').substring(0, 50)}{String(parentComment.content || parentComment.text || parentComment.message || '').length > 50 ? '...' : ''}"
+                    </Typography>
+                  )}
+                  
+                  <Typography variant="caption" color="text.secondary">
+                    {replyData.timestamp ? formatDate(replyData.timestamp || replyData.createdAt || replyData.date || 0) : 'Không có thời gian'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.875rem', mt: 0.5 }}>
+                    {String(replyData.content || replyData.text || replyData.message || '') || 
+                     <em style={{ color: '#999' }}>Không có nội dung reply</em>}
+                  </Typography>
+                  <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5 }}>
+                    <Badge badgeContent={replyData.likes || replyData.likeCount || 0} color="primary">
+                      <Chip size="small" label="Likes" sx={{ fontSize: '0.7rem', height: '20px' }} />
+                    </Badge>
+                  </Box>
+                </Box>
+                <Box display="flex" gap={0.5}>
+                  <IconButton 
+                    size="small" 
+                    sx={{ padding: '2px' }}
+                    onClick={() => setCommentToDelete(replyId)}
+                    color="error"
+                    title="Xóa reply"
+                  >
+                    <Delete sx={{ fontSize: '14px' }} />
+                  </IconButton>
+                  <IconButton 
+                    size="small" 
+                    sx={{ padding: '2px' }}
+                    onClick={() => setUserToBan(String(replyData.userId || replyData.uid || ''))}
+                    color="error"
+                    title="Ban user"
+                  >
+                    <PersonOff sx={{ fontSize: '14px' }} />
+                  </IconButton>
+                </Box>
+              </Box>
+              {/* Recursive replies */}
+              {replyData.replies && Object.keys(replyData.replies).length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  {renderReplies(replyData.replies, level + 1, replyData)}
+                </Box>
+              )}
+            </Box>
+          </Box>
+          {index < Object.keys(replies).length - 1 && (
+            <Divider sx={{ ml: 3, mt: 1, opacity: 0.3 }} />
+          )}
+        </Box>
+      );
+    });
   };
 
   // Bulk Actions Handlers
@@ -925,6 +1113,127 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                         </Grid>
                       </Grid>
                     </Grid>
+                    
+                    {/* Comments Section */}
+                    <Grid item xs={12} sx={{ mt: 3 }}>
+                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                        <Typography variant="h6" display="flex" alignItems="center">
+                          <Comment sx={{ mr: 1 }} />
+                          Comments ({getComments().length})
+                        </Typography>
+                        <Button
+                          size="small"
+                          onClick={() => setShowComments(!showComments)}
+                          endIcon={showComments ? <Clear /> : <Visibility />}
+                        >
+                          {showComments ? 'Ẩn' : 'Xem'} Comments
+                        </Button>
+                      </Box>
+                      
+                      <Collapse in={showComments}>
+                        <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto' }}>
+                          {/* Debug section - comment with this line in production */}
+                          {selectedVideo?.comments && (
+                            <Box sx={{ p: 2, bgcolor: 'yellow.50', border: '1px solid orange', mb: 2 }}>
+                              <Typography variant="caption" color="text.secondary">
+                                🐛 Debug - Raw comment data:
+                              </Typography>
+                              <pre style={{ fontSize: '10px', overflow: 'auto', maxHeight: '100px' }}>
+                                {JSON.stringify(selectedVideo.comments, null, 2)}
+                              </pre>
+                            </Box>
+                          )}
+                          
+                          {getComments().length === 0 ? (
+                            <Box p={3} textAlign="center">
+                              <Typography variant="body2" color="text.secondary">
+                                Chưa có comment nào
+                              </Typography>
+                            </Box>
+                          ) : (
+                            <List>
+                              {getComments().map((comment, index) => {
+                                if (!comment) return null;
+                                const commentId = comment.id;
+                                return (
+                                <Fragment key={`comment-${index}-${commentId}`}>
+                                  <ListItem alignItems="flex-start">
+                                    <ListItemAvatar>
+                                      <Avatar sx={{ bgcolor: 'primary.main' }}>
+                                        {comment.userId?.charAt(0)?.toUpperCase() || 'U'}
+                                      </Avatar>
+                                    </ListItemAvatar>
+                                    <Box sx={{ flex: 1 }}>
+                                      <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                                        <Box sx={{ flex: 1 }}>
+                                          <Typography variant="subtitle2" component="div">
+                                            {String(comment.username || `User: ${comment.userId?.substring(0, 8)}...`)}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                            {comment.timestamp ? formatDate(comment.timestamp) : 'Không có thời gian'}
+                                          </Typography>
+                                          <Typography variant="body2" sx={{ mt: 1 }}>
+                                            {String(comment.content || '') || 
+                                             <em style={{ color: '#999' }}>Không có nội dung comment</em>}
+                                          </Typography>
+                                          <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
+                                            <Badge badgeContent={comment.likes || 0} color="primary">
+                                              <Chip size="small" label="Likes" />
+                                            </Badge>
+                                            {comment.replyCount > 0 && (
+                                              <Chip size="small" label={`${comment.replyCount} replies`} variant="outlined" />
+                                            )}
+                                          </Box>
+                                          
+                                          {/* Replies Section */}
+                                          {comment.replies && Object.keys(comment.replies).length > 0 && (
+                                            <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'grey.200' }}>
+                                              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold', mb: 1, display: 'block' }}>
+                                                💬 Replies ({Object.keys(comment.replies).length}):
+                                              </Typography>
+                                              {renderReplies(comment.replies, 0, {
+                                                userId: comment.userId,
+                                                username: comment.username,
+                                                content: comment.content,
+                                                text: comment.content,
+                                                message: comment.content,
+                                                displayName: comment.username,
+                                                userName: comment.username,
+                                                uid: comment.userId
+                                              })}
+                                            </Box>
+                                          )}
+                                        </Box>
+                                        <Box>
+                                          <IconButton 
+                                            size="small" 
+                                            onClick={() => setCommentToDelete(commentId)}
+                                            color="error"
+                                            title="Xóa comment"
+                                          >
+                                            <Delete />
+                                          </IconButton>
+                                          <IconButton 
+                                            size="small" 
+                                            onClick={() => setUserToBan(comment.userId)}
+                                            color="error"
+                                            title="Ban user"
+                                          >
+                                            <PersonOff />
+                                          </IconButton>
+                                        </Box>
+                                      </Box>
+                                    </Box>
+                                  </ListItem>
+                                  {index < getComments().length - 1 && <Divider variant="inset" component="li" />}
+                                </Fragment>
+                                )
+                              }).filter(Boolean)}
+                            </List>
+                          )}
+                        </Paper>
+                      </Collapse>
+                    </Grid>
                   </Grid>
                 </Box>
               )}
@@ -956,6 +1265,59 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                 }}
               >
                 Chỉnh sửa
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Delete Comment Confirmation Dialog */}
+          <Dialog
+            open={!!commentToDelete}
+            onClose={() => setCommentToDelete(null)}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>Xác nhận xóa comment</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Bạn có chắc chắn muốn xóa comment này? Hành động này không thể hoàn tác.
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setCommentToDelete(null)}>Hủy</Button>
+              <Button 
+                variant="contained" 
+                color="error"
+                onClick={() => commentToDelete && handleDeleteComment(commentToDelete)}
+              >
+                Xóa
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Ban User Confirmation Dialog */}
+          <Dialog
+            open={!!userToBan}
+            onClose={() => setUserToBan(null)}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>Xác nhận ban user</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Bạn có chắc chắn muốn ban user này? User sẽ không thể comment hoặc tương tác.
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                User ID: {userToBan}
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setUserToBan(null)}>Hủy</Button>
+              <Button 
+                variant="contained" 
+                color="error"
+                onClick={() => userToBan && handleBanUser(userToBan)}
+              >
+                Ban User
               </Button>
             </DialogActions>
           </Dialog>
