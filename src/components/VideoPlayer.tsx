@@ -1,29 +1,35 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   Box,
-  IconButton,
-  Slider,
-  Typography,
-  Tooltip,
   CircularProgress,
+  Alert,
+  Typography,
+  Chip,
+  IconButton,
+  Skeleton,
+  Fade,
+  Tooltip,
+  LinearProgress,
+  Slider
 } from '@mui/material';
 import {
   PlayArrow,
   Pause,
-  VolumeUp,
   VolumeOff,
+  VolumeUp,
+  AspectRatio,
   Fullscreen,
-  FullscreenExit,
+  FitScreen
 } from '@mui/icons-material';
-import { getCloudinaryVideoUrl, getCloudinaryVideoThumbnail } from '../utils/cloudinary';
+import { getCloudinaryVideoThumbnail } from '../utils/cloudinary';
 
 interface VideoPlayerProps {
-  videoUrl?: string;
   cloudinaryPublicId?: string;
+  videoUrl?: string;
   thumbnailUrl?: string;
   title?: string;
-  width?: number | string;
-  height?: number | string;
+  width?: string | number;
+  height?: string | number;
   autoPlay?: boolean;
   muted?: boolean;
   controls?: boolean;
@@ -31,11 +37,43 @@ interface VideoPlayerProps {
   onPause?: () => void;
   onEnded?: () => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
+  onVideoInfoLoaded?: (info: { duration: number, fileSize: string, dimensions: string }) => void;
 }
 
+// Cloudinary utilities
+const getCloudinaryVideoUrl = (publicId: string, options?: { quality?: string }) => {
+  const cloudName = 'dazo6ypwt';
+  const quality = options?.quality || 'auto';
+  return `https://res.cloudinary.com/${cloudName}/video/upload/q_${quality}/${publicId}.mp4`;
+};
+
+// Utility functions
+const formatFileSize = (bytes: number) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const formatDuration = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const estimateVideoFileSize = (duration: number, width: number, height: number) => {
+  const pixelCount = width * height;
+  const resolutionFactor = pixelCount / (1920 * 1080);
+  const baseBitrate = 2000000;
+  const estimatedBitrate = baseBitrate * Math.min(resolutionFactor, 1);
+  const estimatedBytes = (duration * estimatedBitrate) / 8;
+  return estimatedBytes;
+};
+
 export default function VideoPlayer({
-  videoUrl,
   cloudinaryPublicId,
+  videoUrl,
   thumbnailUrl,
   title,
   width = '100%',
@@ -47,161 +85,190 @@ export default function VideoPlayer({
   onPause,
   onEnded,
   onTimeUpdate,
+  onVideoInfoLoaded,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // States
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(muted);
+  const [cover, setCover] = useState(false);
+  const [theater, setTheater] = useState(false);
+  const [showToolbar, setShowToolbar] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(muted);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [videoInfo, setVideoInfo] = useState<{
+    duration: number;
+    fileSize: string;
+    dimensions: string;
+  } | null>(null);
 
-  // Get the appropriate video URL
+  // URLs
   const finalVideoUrl = cloudinaryPublicId 
     ? getCloudinaryVideoUrl(cloudinaryPublicId, { quality: 'auto' })
     : videoUrl;
 
-  // Get the appropriate thumbnail URL
   const finalThumbnailUrl = cloudinaryPublicId
     ? getCloudinaryVideoThumbnail(cloudinaryPublicId)
     : thumbnailUrl;
+
+  // Debug logging
+  console.log('VideoPlayer Debug:', {
+    cloudinaryPublicId,
+    videoUrl,
+    thumbnailUrl,
+    finalVideoUrl,
+    finalThumbnailUrl
+  });
+
+  // Validation - show placeholder for missing video
+  if (!finalVideoUrl && !cloudinaryPublicId && !videoUrl) {
+    return (
+      <Box 
+        sx={{ 
+          width, 
+          height, 
+          display: 'flex', 
+          flexDirection: 'column',
+          alignItems: 'center', 
+          justifyContent: 'center',
+          backgroundColor: '#f5f5f5',
+          border: '2px dashed #ddd',
+          borderRadius: 2
+        }}
+      >
+        <PlayArrow sx={{ fontSize: 48, color: '#ccc', mb: 1 }} />
+        <Typography variant="body2" color="text.secondary">
+          Video đang xử lý hoặc chưa upload
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+          CloudinaryID: {cloudinaryPublicId || 'Không có'}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          VideoURL: {videoUrl || 'Không có'}
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Event handlers
+  const handlePlayPause = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play().catch(console.warn);
+      setIsPlaying(true);
+      onPlay?.();
+    } else {
+      video.pause();
+      setIsPlaying(false);
+      onPause?.();
+    }
+  };
+
+  const handleMuteToggle = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.muted = !video.muted;
+    setIsMuted(video.muted);
+  };
+
+  const handleFitToggle = () => {
+    setCover(!cover);
+  };
+
+  const handleTheaterToggle = () => {
+    setTheater(!theater);
+  };
+
+  const handleSeek = (event: Event, newValue: number | number[]) => {
+    const video = videoRef.current;
+    if (!video || Array.isArray(newValue)) return;
+
+    const seekTime = (newValue / 100) * duration;
+    video.currentTime = seekTime;
+    setCurrentTime(seekTime);
+  };
+
+  const getProgress = () => {
+    if (duration === 0) return 0;
+    return (currentTime / duration) * 100;
+  };
+
+  // Video event handlers
+  const handleLoadedMetadata = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setLoading(false);
+    setDuration(video.duration);
+    
+    // Unmute if not initially muted
+    if (!muted) {
+      video.muted = false;
+      setIsMuted(false);
+    }
+
+    // Update video info
+    if (video.duration && video.videoWidth && video.videoHeight) {
+      const estimatedBytes = estimateVideoFileSize(video.duration, video.videoWidth, video.videoHeight);
+      const info = {
+        duration: video.duration,
+        fileSize: formatFileSize(estimatedBytes),
+        dimensions: `${video.videoWidth}x${video.videoHeight}`,
+      };
+      setVideoInfo(info);
+      onVideoInfoLoaded?.(info);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setCurrentTime(video.currentTime);
+    onTimeUpdate?.(video.currentTime, video.duration);
+  };
+
+  const handleVideoClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    handlePlayPause();
+  };
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    const handleLoadedMetadata = () => {
-      setDuration(video.duration);
-      setLoading(false);
-    };
-
-    const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
-      onTimeUpdate?.(video.currentTime, video.duration);
-    };
-
-    const handlePlay = () => {
-      setIsPlaying(true);
-      onPlay?.();
-    };
-
-    const handlePause = () => {
-      setIsPlaying(false);
-      onPause?.();
-    };
-
-    const handleEnded = () => {
-      setIsPlaying(false);
-      onEnded?.();
-    };
-
-    const handleError = () => {
-      setError(true);
-      setLoading(false);
-    };
-
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('timeupdate', handleTimeUpdate);
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('ended', handleEnded);
-    video.addEventListener('error', handleError);
+    video.addEventListener('play', () => setIsPlaying(true));
+    video.addEventListener('pause', () => setIsPlaying(false));
+    video.addEventListener('ended', () => {
+      setIsPlaying(false);
+      onEnded?.();
+    });
+    video.addEventListener('error', () => {
+      setError('Không thể tải video');
+      setLoading(false);
+    });
 
     return () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('timeupdate', handleTimeUpdate);
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('ended', handleEnded);
-      video.removeEventListener('error', handleError);
     };
-  }, [onPlay, onPause, onEnded, onTimeUpdate]);
+  }, [finalVideoUrl]);
 
-  const togglePlay = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (isPlaying) {
-      video.pause();
-    } else {
-      video.play();
-    }
-  };
-
-  const handleSeek = (value: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.currentTime = value;
-    setCurrentTime(value);
-  };
-
-  const handleVolumeChange = (value: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.volume = value;
-    setVolume(value);
-    setIsMuted(value === 0);
-  };
-
-  const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (isMuted) {
-      video.volume = volume;
-      setIsMuted(false);
-    } else {
-      video.volume = 0;
-      setIsMuted(true);
-    }
-  };
-
-  const toggleFullscreen = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (!isFullscreen) {
-      if (video.requestFullscreen) {
-        video.requestFullscreen();
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    }
-    setIsFullscreen(!isFullscreen);
-  };
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+  const aspectRatio = theater ? '21/9' : '16/9';
+  const objectFit = cover ? 'cover' : 'contain';
 
   if (error) {
     return (
-      <Box
-        sx={{
-          width,
-          height,
-          bgcolor: 'grey.200',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          borderRadius: 1,
-        }}
-      >
-        <Typography color="error" variant="body2">
-          Không thể tải video
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {finalVideoUrl}
-        </Typography>
+      <Box sx={{ width, height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Alert severity="error">{error}</Alert>
       </Box>
     );
   }
@@ -209,151 +276,261 @@ export default function VideoPlayer({
   return (
     <Box
       sx={{
-        position: 'relative',
         width,
-        height,
-        bgcolor: 'black',
-        borderRadius: 1,
+        aspectRatio,
+        backgroundColor: '#000',
+        position: 'relative',
+        borderRadius: 2,
         overflow: 'hidden',
-        '&:hover .video-controls': {
-          opacity: 1,
-        },
+        boxShadow: 'none',
+        cursor: 'pointer',
+        border: '1px solid #333',
       }}
+      onMouseEnter={() => setShowToolbar(true)}
+      onMouseLeave={() => setShowToolbar(false)}
+      onClick={handleVideoClick}
     >
       {/* Video Element */}
       <video
         ref={videoRef}
-        src={finalVideoUrl}
+        src={finalVideoUrl || (cloudinaryPublicId ? getCloudinaryVideoUrl(cloudinaryPublicId) : undefined)}
         poster={finalThumbnailUrl}
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'contain',
+          objectFit,
+          objectPosition: 'center',
         }}
         autoPlay={autoPlay}
-        muted={muted}
+        muted={isMuted}
+        controls={false}
         playsInline
+        preload="metadata"
       />
 
-      {/* Loading */}
+      {/* Skeleton Loading */}
       {loading && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-          <CircularProgress color="primary" />
-        </Box>
-      )}
-
-      {/* Custom Controls */}
-      {controls && !loading && (
-        <Box
-          className="video-controls"
-          sx={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-            p: 1,
-            opacity: 0,
-            transition: 'opacity 0.3s ease',
-          }}
-        >
-          {/* Progress Bar */}
-          <Slider
-            size="small"
-            value={currentTime}
-            min={0}
-            max={duration || 100}
-            onChange={(_, value) => handleSeek(value as number)}
-            sx={{
-              color: '#4CAF50',
-              mb: 1,
-              '& .MuiSlider-thumb': {
-                width: 12,
-                height: 12,
-              },
-            }}
-          />
-
-          {/* Control Buttons */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {/* Play/Pause */}
-            <Tooltip title={isPlaying ? 'Pause' : 'Play'}>
-              <IconButton size="small" onClick={togglePlay} sx={{ color: 'white' }}>
-                {isPlaying ? <Pause /> : <PlayArrow />}
-              </IconButton>
-            </Tooltip>
-
-            {/* Time */}
-            <Typography variant="caption" sx={{ color: 'white', minWidth: 80 }}>
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </Typography>
-
-            {/* Spacer */}
-            <Box sx={{ flexGrow: 1 }} />
-
-            {/* Volume */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: 100 }}>
-              <Tooltip title={isMuted ? 'Unmute' : 'Mute'}>
-                <IconButton size="small" onClick={toggleMute} sx={{ color: 'white' }}>
-                  {isMuted ? <VolumeOff /> : <VolumeUp />}
-                </IconButton>
-              </Tooltip>
-              <Slider
-                size="small"
-                value={isMuted ? 0 : volume}
-                min={0}
-                max={1}
-                step={0.1}
-                onChange={(_, value) => handleVolumeChange(value as number)}
-                sx={{
-                  color: 'white',
-                  '& .MuiSlider-thumb': {
-                    width: 8,
-                    height: 8,
-                  },
-                }}
-              />
-            </Box>
-
-            {/* Fullscreen */}
-            <Tooltip title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
-              <IconButton size="small" onClick={toggleFullscreen} sx={{ color: 'white' }}>
-                {isFullscreen ? <FullscreenExit /> : <Fullscreen />}
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </Box>
-      )}
-
-      {/* Title Overlay */}
-      {title && (
         <Box
           sx={{
             position: 'absolute',
             top: 0,
             left: 0,
             right: 0,
-            background: 'linear-gradient(rgba(0,0,0,0.7), transparent)',
-            p: 1,
-            opacity: 0,
-            transition: 'opacity 0.3s ease',
-            '.video-controls:hover ~ &, &:hover': {
-              opacity: 1,
-            },
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#000',
+            zIndex: 1,
           }}
         >
-          <Typography variant="subtitle2" sx={{ color: 'white' }}>
+          <Skeleton
+            variant="rectangular"
+            width="100%"
+            height="100%"
+            animation="wave"
+            sx={{
+              bgcolor: '#1a1a1a',
+              '&::after': {
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)',
+              }
+            }}
+          />
+          <CircularProgress
+            sx={{
+              position: 'absolute',
+              color: 'primary.main',
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Title Overlay */}
+      {title && !loading && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%)',
+            p: 2,
+            zIndex: 2,
+          }}
+        >
+          <Typography
+            variant="h6"
+            sx={{
+              color: 'white',
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+            }}
+          >
             {title}
           </Typography>
         </Box>
       )}
+
+      {/* Info Chips */}
+      {videoInfo && !loading && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 24,
+            right: 16,
+            display: 'flex',
+            gap: 1,
+            zIndex: 2,
+          }}
+        >
+          <Chip
+            label={formatDuration(currentTime) + ' / ' + formatDuration(duration)}
+            size="small"
+            sx={{
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              fontWeight: 'bold',
+            }}
+          />
+          <Chip
+            label={videoInfo.dimensions}
+            size="small"
+            sx={{
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+            }}
+          />
+          <Chip
+            label={videoInfo.fileSize}
+            size="small"
+            sx={{
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Progress Bar */}
+      {!loading && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 4,
+            backgroundColor: 'rgba(255,255,255,0.3)',
+            zIndex: 2,
+            transition: 'height 0.2s ease',
+            '&:hover': {
+              height: 8,
+            },
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Slider
+            value={getProgress()}
+            onChange={handleSeek}
+            sx={{
+              position: 'absolute',
+              top: -2,
+              left: 0,
+              right: 0,
+              height: 8,
+              padding: 0,
+              '& .MuiSlider-track': {
+                backgroundColor: 'primary.main',
+                border: 'none',
+                height: 4,
+              },
+              '& .MuiSlider-rail': {
+                backgroundColor: 'rgba(255,255,255,0.3)',
+                height: 4,
+              },
+              '& .MuiSlider-thumb': {
+                width: 12,
+                height: 12,
+                backgroundColor: 'primary.main',
+                border: '2px solid white',
+                '&:hover': {
+                  boxShadow: '0 0 0 8px rgba(25, 118, 210, 0.16)',
+                },
+                '&:focus, &:hover, &.Mui-active': {
+                  boxShadow: '0 0 0 8px rgba(25, 118, 210, 0.16)',
+                },
+              },
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Toolbar */}
+      <Fade in={showToolbar && !loading}>
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 24,
+            left: 16,
+            display: 'flex',
+            gap: 1,
+            zIndex: 3,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Tooltip title={isPlaying ? "Pause" : "Play"}>
+            <IconButton
+              onClick={handlePlayPause}
+              sx={{
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' },
+              }}
+            >
+              {isPlaying ? <Pause /> : <PlayArrow />}
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title={isMuted ? "Unmute" : "Mute"}>
+            <IconButton
+              onClick={handleMuteToggle}
+              sx={{
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' },
+              }}
+            >
+              {isMuted ? <VolumeOff /> : <VolumeUp />}
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title={cover ? "Fit: Contain" : "Fit: Cover"}>
+            <IconButton
+              onClick={handleFitToggle}
+              sx={{
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' },
+              }}
+            >
+              {cover ? <FitScreen /> : <AspectRatio />}
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title={theater ? "Exit Theater" : "Theater Mode"}>
+            <IconButton
+              onClick={handleTheaterToggle}
+              sx={{
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' },
+              }}
+            >
+              <Fullscreen />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Fade>
     </Box>
   );
 }

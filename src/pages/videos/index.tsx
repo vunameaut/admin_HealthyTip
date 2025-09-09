@@ -52,7 +52,9 @@ import {
   CheckCircle,
   Error,
   Schedule,
-  TrendingUp
+  TrendingUp,
+  FileUpload,
+  FileDownload
 } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import { useDropzone } from 'react-dropzone';
@@ -156,11 +158,12 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
           // Upload to Cloudinary
           const uploadResult = await uploadVideoToCloudinary(file, {
             folder: 'health_videos',
-            uploadPreset: 'health_videos',
             onProgress: (progress) => {
               setUploadProgress((i / files.length * 100) + (progress / files.length));
             }
           });
+          
+          console.log('Upload result:', uploadResult); // Debug log
           
           // Create video record in Firebase
           const newVideo: Omit<ShortVideo, 'id'> = {
@@ -179,6 +182,8 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
             width: uploadResult.width || 0,
             height: uploadResult.height || 0
           };
+          
+          console.log('New video data:', newVideo); // Debug log
           
           // Add to database
           await videosService.create(newVideo);
@@ -239,6 +244,7 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
   };
 
   const handleViewVideo = (video: ShortVideo) => {
+    console.log('Opening video dialog for:', video); // Debug log
     setSelectedVideo(video);
     setVideoDetailOpen(true);
   };
@@ -252,6 +258,151 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
     }
   };
 
+  // Bulk Actions Handlers
+  const handleBulkStatusChange = async (newStatus: 'draft' | 'published' | 'archived' | 'processing' | 'failed') => {
+    try {
+      setLoading(true);
+      const promises = selectedRows.map((id) => 
+        videosService.update(id as string, { status: newStatus })
+      );
+      await Promise.all(promises);
+      toast.success(`Đã cập nhật trạng thái cho ${selectedRows.length} video`);
+      setSelectedRows([]);
+      loadData();
+    } catch (error) {
+      console.error('Error updating video status:', error);
+      toast.error('Có lỗi xảy ra khi cập nhật trạng thái');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedRows.length} video đã chọn?`)) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const promises = selectedRows.map((id) => 
+        videosService.delete(id as string)
+      );
+      await Promise.all(promises);
+      toast.success(`Đã xóa ${selectedRows.length} video`);
+      setSelectedRows([]);
+      loadData();
+    } catch (error) {
+      console.error('Error deleting videos:', error);
+      toast.error('Có lỗi xảy ra khi xóa video');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkExport = () => {
+    try {
+      const selectedVideos = videos.filter(video => selectedRows.includes(video.id));
+      const dataStr = JSON.stringify(selectedVideos, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `videos_export_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Đã export ${selectedRows.length} video`);
+    } catch (error) {
+      console.error('Error exporting videos:', error);
+      toast.error('Có lỗi xảy ra khi export video');
+    }
+  };
+
+  // Export all videos data
+  const exportVideoData = () => {
+    try {
+      const dataStr = JSON.stringify(videos, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `all_videos_export_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Đã export ${videos.length} video`);
+    } catch (error) {
+      console.error('Error exporting all videos:', error);
+      toast.error('Có lỗi xảy ra khi export video');
+    }
+  };
+
+  // Import videos from JSON file
+  const handleVideoImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      toast.error('Vui lòng chọn file JSON hợp lệ');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const fileContent = await file.text();
+      const importedVideos = JSON.parse(fileContent);
+
+      if (!Array.isArray(importedVideos)) {
+        toast.error('File JSON không đúng định dạng (phải là mảng video)');
+        return;
+      }
+
+      // Validate and process each video
+      const validVideos = [];
+      for (const video of importedVideos) {
+        if (video.title && video.caption) {
+          const processedVideo = {
+            title: video.title,
+            caption: video.caption || video.description || '',
+            videoUrl: video.videoUrl || '',
+            thumbnailUrl: video.thumbnailUrl || '',
+            cloudinaryPublicId: video.cloudinaryPublicId || video.cldPublicId || '',
+            categoryId: video.categoryId || '',
+            uploadDate: video.uploadDate || Date.now(),
+            duration: video.duration || 0,
+            status: (video.status as 'draft' | 'published' | 'archived' | 'processing' | 'failed') || 'draft',
+            tags: video.tags || {},
+            viewCount: video.viewCount || video.views || 0,
+            likeCount: video.likeCount || video.likes || 0,
+            userId: video.userId || 'admin',
+            width: video.width,
+            height: video.height,
+            updatedAt: Date.now()
+          };
+          validVideos.push(processedVideo);
+        }
+      }
+
+      if (validVideos.length === 0) {
+        toast.error('Không có video hợp lệ nào để import');
+        return;
+      }
+
+      // Batch import to Firebase
+      const promises = validVideos.map(video => videosService.create(video));
+      await Promise.all(promises);
+
+      toast.success(`Đã import thành công ${validVideos.length} video`);
+      loadData(); // Reload data to show imported videos
+      
+      // Clear file input
+      event.target.value = '';
+    } catch (error) {
+      console.error('Error importing videos:', error);
+      toast.error('Có lỗi xảy ra khi import video. Vui lòng kiểm tra định dạng file.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const columns: GridColDef[] = [
     {
       field: 'thumbnailUrl',
@@ -259,20 +410,67 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
       width: 120,
       sortable: false,
       renderCell: (params) => {
-        const thumbnailUrl = params.row.cloudinaryPublicId 
-          ? getCloudinaryVideoThumbnail(params.row.cloudinaryPublicId, { width: 160, height: 120 })
-          : params.value;
+        let thumbnailUrl = '';
+        
+        // Try different sources for thumbnail
+        if (params.row.cloudinaryPublicId) {
+          thumbnailUrl = getCloudinaryVideoThumbnail(params.row.cloudinaryPublicId, { width: 160, height: 120 });
+        } else if (params.row.thumbnailUrl) {
+          thumbnailUrl = params.row.thumbnailUrl;
+        }
         
         return (
-          <Avatar
-            variant="rounded"
-            src={thumbnailUrl}
-            sx={{ width: 80, height: 60 }}
+          <Box
+            sx={{
+              width: 80,
+              height: 60,
+              backgroundColor: '#f5f5f5',
+              borderRadius: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              overflow: 'hidden',
+              border: '1px solid #ddd',
+              position: 'relative'
+            }}
             onClick={() => handleViewVideo(params.row)}
-            style={{ cursor: 'pointer' }}
           >
-            <PlayArrow />
-          </Avatar>
+            {thumbnailUrl && (
+              <img
+                src={thumbnailUrl}
+                alt="Thumbnail"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            )}
+            {!thumbnailUrl && (
+              <Typography variant="caption" sx={{ 
+                fontSize: 8, 
+                textAlign: 'center', 
+                px: 0.5,
+                color: 'text.secondary'
+              }}>
+                {params.row.title?.substring(0, 15)}...
+              </Typography>
+            )}
+            <PlayArrow 
+              sx={{ 
+                position: 'absolute',
+                color: thumbnailUrl ? 'white' : 'primary.main',
+                fontSize: 20,
+                backgroundColor: thumbnailUrl ? 'rgba(0,0,0,0.6)' : 'transparent',
+                borderRadius: '50%',
+                padding: 0.5
+              }} 
+            />
+          </Box>
         );
       }
     },
@@ -428,6 +626,21 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
             <Box display="flex" gap={1}>
               <Button
                 variant="outlined"
+                startIcon={<FileUpload />}
+                onClick={() => document.getElementById('video-import-file-input')?.click()}
+              >
+                Nhập dữ liệu
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<FileDownload />}
+                onClick={exportVideoData}
+                disabled={videos.length === 0}
+              >
+                Xuất dữ liệu
+              </Button>
+              <Button
+                variant="outlined"
                 startIcon={<Refresh />}
                 onClick={loadData}
               >
@@ -533,6 +746,57 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
 
           {/* Videos Table */}
           <Card>
+            {/* Bulk Actions Toolbar */}
+            {selectedRows.length > 0 && (
+              <Box sx={{ 
+                p: 2, 
+                bgcolor: 'action.selected', 
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <Typography variant="subtitle1" fontWeight="medium">
+                  Đã chọn {selectedRows.length} video
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<CheckCircle />}
+                    onClick={() => handleBulkStatusChange('published')}
+                  >
+                    Xuất bản
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<Schedule />}
+                    onClick={() => handleBulkStatusChange('draft')}
+                  >
+                    Chuyển thành nháp
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<Download />}
+                    onClick={handleBulkExport}
+                  >
+                    Export
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="error"
+                    startIcon={<Delete />}
+                    onClick={handleBulkDelete}
+                  >
+                    Xóa
+                  </Button>
+                </Box>
+              </Box>
+            )}
             <Box sx={{ height: 600, width: '100%' }}>
               {loading && <LinearProgress />}
               <DataGrid
@@ -621,6 +885,7 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                         width="100%"
                         height={200}
                         controls={true}
+                        muted={false}
                       />
                     </Grid>
                     <Grid item xs={12} md={6}>
@@ -660,7 +925,32 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setVideoDetailOpen(false)}>Đóng</Button>
-              <Button variant="contained">Chỉnh sửa</Button>
+              <Button 
+                onClick={() => {
+                  if (selectedVideo) {
+                    console.log('Selected video data:', selectedVideo);
+                    const dataStr = JSON.stringify(selectedVideo, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(dataBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `video_debug_${selectedVideo.id}.json`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  }
+                }}
+              >
+                Debug
+              </Button>
+              <Button 
+                variant="contained"
+                onClick={() => {
+                  setVideoDetailOpen(false);
+                  router.push(`/videos/edit/${selectedVideo?.id}`);
+                }}
+              >
+                Chỉnh sửa
+              </Button>
             </DialogActions>
           </Dialog>
 
@@ -673,6 +963,15 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
           >
             <Add />
           </Fab>
+
+          {/* Hidden file input for import */}
+          <input
+            id="video-import-file-input"
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={handleVideoImportFile}
+          />
         </Box>
       </LayoutWrapper>
     </AuthGuard>

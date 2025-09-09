@@ -200,6 +200,74 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
     linkElement.click();
   };
 
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const importedData = JSON.parse(text);
+      
+      if (!Array.isArray(importedData)) {
+        toast.error('File không đúng định dạng. Vui lòng chọn file JSON hợp lệ.');
+        return;
+      }
+
+      const confirmImport = confirm(`Bạn có muốn nhập ${importedData.length} bài viết? Dữ liệu hiện tại sẽ được thêm vào.`);
+      if (!confirmImport) return;
+
+      setLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const item of importedData) {
+        try {
+          // Validate required fields
+          if (!item.title || !item.content) {
+            errorCount++;
+            continue;
+          }
+
+          // Find category by name if provided
+          let categoryId = '';
+          if (item.category) {
+            const category = categories.find(c => c.name === item.category);
+            categoryId = category?.id || '';
+          }
+
+          const healthTipData = {
+            title: item.title,
+            content: item.content,
+            categoryId: categoryId,
+            status: item.status || 'draft',
+            author: item.author || 'Imported',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            viewCount: item.viewCount || 0,
+            likeCount: item.likeCount || 0,
+            isFeature: item.isFeature || false
+          };
+
+          await healthTipsService.create(healthTipData);
+          successCount++;
+        } catch (error) {
+          console.error('Error importing item:', error);
+          errorCount++;
+        }
+      }
+
+      toast.success(`Đã nhập thành công ${successCount} bài viết${errorCount > 0 ? `, ${errorCount} bài viết lỗi` : ''}`);
+      loadData();
+    } catch (error) {
+      console.error('Error parsing import file:', error);
+      toast.error('File không đúng định dạng hoặc bị lỗi. Vui lòng kiểm tra lại.');
+    } finally {
+      setLoading(false);
+      // Reset file input
+      event.target.value = '';
+    }
+  };
+
   const columns: GridColDef[] = [
     {
       field: 'title',
@@ -318,6 +386,13 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
               Quản lý nội dung
             </Typography>
             <Box display="flex" gap={1}>
+              <Button
+                variant="outlined"
+                startIcon={<FileUpload />}
+                onClick={() => document.getElementById('import-file-input')?.click()}
+              >
+                Nhập dữ liệu
+              </Button>
               <Button
                 variant="outlined"
                 startIcon={<FileDownload />}
@@ -482,6 +557,15 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
           >
             <Add />
           </Fab>
+
+          {/* Hidden file input for import */}
+          <input
+            id="import-file-input"
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={handleImportFile}
+          />
         </Box>
       </LayoutWrapper>
     </AuthGuard>

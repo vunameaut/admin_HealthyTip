@@ -57,7 +57,7 @@ import toast from 'react-hot-toast';
 import Header from './Header';
 import { useCurrentUser } from './AuthGuard';
 
-const drawerWidth = 240;
+const drawerWidth = 280;
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -117,8 +117,6 @@ export default function DashboardLayout({
         { id: 'health-tips', title: 'Bài viết (Health Tips)', icon: Article, path: '/content' },
         { id: 'videos', title: 'Video ngắn', icon: VideoLibrary, path: '/videos' },
         { id: 'categories', title: 'Danh mục & Tags', icon: Category, path: '/content/categories' },
-        { id: 'collections', title: 'Bộ sưu tập', icon: Collection, path: '/content/collections' },
-        { id: 'import-export', title: 'Import/Export', icon: Campaign, path: '/content/import-export' },
       ]
     },
     {
@@ -224,8 +222,12 @@ export default function DashboardLayout({
       {/* Health Stats Card */}
       <Box sx={{ p: 2 }}>
         <Card sx={{ 
-          background: 'linear-gradient(135deg, #E8F5E8 0%, #F1F8E9 100%)',
-          border: `1px solid ${theme.palette.primary.light}20`,
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, #1e1e1e 0%, #262626 100%)'
+            : 'linear-gradient(135deg, #E8F5E8 0%, #F1F8E9 100%)',
+          border: theme.palette.mode === 'dark'
+            ? '1px solid #404040'
+            : `1px solid ${theme.palette.primary.light}20`,
           boxShadow: 'none',
         }}>
           <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
@@ -468,7 +470,7 @@ export default function DashboardLayout({
                   fontSize: '0.8rem'
                 }}
               >
-                Quản lý hệ thống sức khỏe
+                HealthyTip Admin Panel
               </Typography>
             </Box>
           </Box>

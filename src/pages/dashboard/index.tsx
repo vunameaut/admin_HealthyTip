@@ -17,6 +17,7 @@ import {
   Chip,
   Avatar,
   IconButton,
+  useTheme,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -42,6 +43,7 @@ interface DashboardPageProps {
 
 export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPageProps) {
   const { currentUser, loading: userLoading } = useCurrentUser();
+  const theme = useTheme();
   const [analytics, setAnalytics] = useState<Partial<Analytics>>({});
   const [recentHealthTips, setRecentHealthTips] = useState<HealthTip[]>([]);
   const [recentVideos, setRecentVideos] = useState<ShortVideo[]>([]);
@@ -114,13 +116,19 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
   const StatCard = ({ title, value, icon, color, loading }: any) => (
     <Card sx={{ 
       height: '100%',
-      background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)',
-      border: '1px solid #E1E8ED',
+      background: theme.palette.mode === 'dark' 
+        ? 'linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%)'
+        : 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)',
+      border: theme.palette.mode === 'dark'
+        ? '1px solid #333'
+        : '1px solid #E1E8ED',
       borderRadius: 3,
       transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
       '&:hover': {
         transform: 'translateY(-4px)',
-        boxShadow: '0 8px 25px rgba(76, 175, 80, 0.15)',
+        boxShadow: theme.palette.mode === 'dark'
+          ? '0 8px 25px rgba(76, 175, 80, 0.3)'
+          : '0 8px 25px rgba(76, 175, 80, 0.15)',
       }
     }}>
       <CardContent sx={{ p: 3 }}>
@@ -175,7 +183,9 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
         <Box sx={{ 
           flexGrow: 1, 
           p: 3,
-          background: 'linear-gradient(135deg, #F5F7FA 0%, #E8F5E8 100%)',
+          background: theme.palette.mode === 'dark' 
+            ? 'linear-gradient(135deg, #121212 0%, #1a1a1a 100%)'
+            : 'linear-gradient(135deg, #F5F7FA 0%, #E8F5E8 100%)',
           minHeight: '100vh',
         }}>
           {/* Header */}
@@ -186,9 +196,13 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
             mb: 4,
             p: 3,
             borderRadius: 3,
-            background: 'rgba(255, 255, 255, 0.8)',
+            background: theme.palette.mode === 'dark'
+              ? 'rgba(30, 30, 30, 0.8)'
+              : 'rgba(255, 255, 255, 0.8)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid #E1E8ED',
+            border: theme.palette.mode === 'dark'
+              ? '1px solid #333'
+              : '1px solid #E1E8ED',
           }}>
             <Box>
               <Typography variant="h4" sx={{ 
@@ -267,8 +281,12 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
           {/* Recent Health Tips */}
           <Grid item xs={12} lg={6}>
             <Card sx={{
-              background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)',
-              border: '1px solid #E1E8ED',
+              background: theme.palette.mode === 'dark'
+                ? 'linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%)'
+                : 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)',
+              border: theme.palette.mode === 'dark'
+                ? '1px solid #333'
+                : '1px solid #E1E8ED',
               borderRadius: 3,
             }}>
               <CardContent sx={{ p: 3 }}>
@@ -334,8 +352,12 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
           {/* Recent Videos */}
           <Grid item xs={12} lg={6}>
             <Card sx={{
-              background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)',
-              border: '1px solid #E1E8ED',
+              background: theme.palette.mode === 'dark'
+                ? 'linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%)'
+                : 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)',
+              border: theme.palette.mode === 'dark'
+                ? '1px solid #333'
+                : '1px solid #E1E8ED',
               borderRadius: 3,
             }}>
               <CardContent sx={{ p: 3 }}>

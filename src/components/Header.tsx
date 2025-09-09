@@ -43,7 +43,7 @@ const Header: React.FC<HeaderProps> = ({ darkMode = false, size = 'medium' }) =>
             mb: size === 'small' ? 0 : 0.5,
           }}
         >
-          HealthTips Smart
+          HealthyTip Admin
         </Typography>
         {size !== 'small' && (
           <Typography

@@ -34,7 +34,6 @@ import AuthGuard from '../../../components/AuthGuard';
 import VideoPlayer from '../../../components/VideoPlayer';
 import { videosService, categoriesService } from '../../../services/firebase';
 import { ShortVideo, Category } from '../../../types';
-import { getCloudinaryVideoUrl, getCloudinaryVideoThumbnail } from '../../../utils/cloudinary';
 import toast from 'react-hot-toast';
 
 interface EditVideoPageProps {
@@ -51,6 +50,11 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [videoInfo, setVideoInfo] = useState<{
+    duration: number;
+    fileSize: string;
+    dimensions: string;
+  } | null>(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -74,6 +78,7 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
       ]);
       
       if (videoData) {
+        console.log('Video data loaded:', videoData);
         setVideo(videoData);
         setFormData({
           title: videoData.title,
@@ -92,6 +97,23 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
       toast.error('Có lỗi khi tải dữ liệu');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVideoInfoLoaded = (info: { duration: number, fileSize: string, dimensions: string }) => {
+    console.log('Video info loaded from player:', info);
+    setVideoInfo(info);
+    
+    // Cập nhật thông tin video trong database nếu cần
+    if (video && video.id) {
+      const [width, height] = info.dimensions.split('x').map(Number);
+      videosService.update(video.id, {
+        duration: Math.round(info.duration),
+        width,
+        height
+      }).catch(error => {
+        console.error('Error updating video info:', error);
+      });
     }
   };
 
@@ -208,13 +230,6 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
             <Box display="flex" gap={1}>
               <Button
                 variant="outlined"
-                startIcon={<Visibility />}
-                onClick={() => window.open(`/videos/${video.id}`, '_blank')}
-              >
-                Xem trước
-              </Button>
-              <Button
-                variant="outlined"
                 color="error"
                 startIcon={<Delete />}
                 onClick={() => setDeleteDialogOpen(true)}
@@ -242,13 +257,34 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
                     Video Preview
                   </Typography>
                   
-                  {video.videoUrl && (
+                  {(video.videoUrl || video.cldPublicId || video.cloudinaryPublicId) && (
                     <Box mb={2}>
                       <VideoPlayer
-                        videoUrl={getCloudinaryVideoUrl(video.cloudinaryPublicId || video.videoUrl)}
-                        thumbnailUrl={getCloudinaryVideoThumbnail(video.cloudinaryPublicId || video.videoUrl)}
+                        cloudinaryPublicId={video.cldPublicId || video.cloudinaryPublicId}
+                        videoUrl={video.videoUrl}
+                        thumbnailUrl={video.thumbnailUrl || video.thumb}
                         title={video.title}
+                        controls={true}
+                        muted={false}
+                        width="100%"
+                        height={250}
+                        onVideoInfoLoaded={handleVideoInfoLoaded}
                       />
+                    </Box>
+                  )}
+                  
+                  {!(video.videoUrl || video.cldPublicId || video.cloudinaryPublicId) && (
+                    <Box mb={2} p={2} bgcolor="grey.100" borderRadius={1}>
+                      <Typography color="text.secondary">
+                        Video không có sẵn hoặc đang tải...
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Video URL: {video.videoUrl || 'không có'}
+                      </Typography>
+                      <br />
+                      <Typography variant="caption" color="text.secondary">
+                        Cloudinary ID: {video.cldPublicId || video.cloudinaryPublicId || 'không có'}
+                      </Typography>
                     </Box>
                   )}
                   
@@ -277,11 +313,24 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
                     </Typography>
                   )}
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Thời lượng:</strong> {Math.floor((video.duration || 0) / 60)}:{((video.duration || 0) % 60).toString().padStart(2, '0')}
+                    <strong>Thời lượng:</strong> {
+                      videoInfo 
+                        ? `${Math.floor(videoInfo.duration / 60)}:${Math.floor(videoInfo.duration % 60).toString().padStart(2, '0')}`
+                        : `${Math.floor((video.duration || 0) / 60)}:${((video.duration || 0) % 60).toString().padStart(2, '0')}`
+                    }
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Kích thước:</strong> {video.width}x{video.height}
+                    <strong>Kích thước:</strong> {
+                      videoInfo 
+                        ? videoInfo.dimensions
+                        : `${video.width || 'x'}x${video.height || 'x'}`
+                    }
                   </Typography>
+                  {videoInfo && (
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Dung lượng:</strong> {videoInfo.fileSize}
+                    </Typography>
+                  )}
                 </CardContent>
               </Card>
             </Grid>

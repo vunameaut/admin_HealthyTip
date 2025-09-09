@@ -23,7 +23,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'medium' }) => {
     <Box
       component="img"
       src={isDark ? '/images/logos/cu_black_rmbg.png' : '/images/logos/cu_night_rmbg.png'}
-      alt="HealthTips Smart Logo"
+      alt="HealthyTip Admin Logo"
       sx={{
         width: logoSize,
         height: logoSize,

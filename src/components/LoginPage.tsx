@@ -208,7 +208,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ darkMode, toggleDarkMode }) => {
                     mb: 0.5,
                   }}
                 >
-                  HealthTips Smart
+                  HealthyTip Admin
                 </Typography>
                 <Typography
                   variant="body2"
