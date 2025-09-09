@@ -412,8 +412,12 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
       renderCell: (params) => {
         let thumbnailUrl = '';
         
-        // Try different sources for thumbnail
-        if (params.row.cloudinaryPublicId) {
+        // Try different sources for thumbnail - prioritize 'thumb' field
+        if (params.row.thumb) {
+          thumbnailUrl = params.row.thumb;
+        } else if (params.row.cldPublicId) {
+          thumbnailUrl = getCloudinaryVideoThumbnail(params.row.cldPublicId, { width: 160, height: 120 });
+        } else if (params.row.cloudinaryPublicId) {
           thumbnailUrl = getCloudinaryVideoThumbnail(params.row.cloudinaryPublicId, { width: 160, height: 120 });
         } else if (params.row.thumbnailUrl) {
           thumbnailUrl = params.row.thumbnailUrl;
@@ -880,7 +884,9 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                       <VideoPlayer
                         videoUrl={selectedVideo.videoUrl}
                         cloudinaryPublicId={selectedVideo.cloudinaryPublicId}
+                        cldPublicId={selectedVideo.cldPublicId}
                         thumbnailUrl={selectedVideo.thumbnailUrl}
+                        thumb={selectedVideo.thumb}
                         title={selectedVideo.title}
                         width="100%"
                         height={200}

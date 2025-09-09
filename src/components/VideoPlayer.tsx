@@ -25,8 +25,10 @@ import { getCloudinaryVideoThumbnail } from '../utils/cloudinary';
 
 interface VideoPlayerProps {
   cloudinaryPublicId?: string;
+  cldPublicId?: string; // Add support for cldPublicId
   videoUrl?: string;
   thumbnailUrl?: string;
+  thumb?: string; // Add support for thumb
   title?: string;
   width?: string | number;
   height?: string | number;
@@ -73,8 +75,10 @@ const estimateVideoFileSize = (duration: number, width: number, height: number) 
 
 export default function VideoPlayer({
   cloudinaryPublicId,
+  cldPublicId,
   videoUrl,
   thumbnailUrl,
+  thumb,
   title,
   width = '100%',
   height = 300,
@@ -105,26 +109,31 @@ export default function VideoPlayer({
     dimensions: string;
   } | null>(null);
 
-  // URLs
-  const finalVideoUrl = cloudinaryPublicId 
-    ? getCloudinaryVideoUrl(cloudinaryPublicId, { quality: 'auto' })
+  // URLs - prioritize cldPublicId over cloudinaryPublicId
+  const publicId = cldPublicId || cloudinaryPublicId;
+  
+  const finalVideoUrl = publicId 
+    ? getCloudinaryVideoUrl(publicId, { quality: 'auto' })
     : videoUrl;
 
-  const finalThumbnailUrl = cloudinaryPublicId
-    ? getCloudinaryVideoThumbnail(cloudinaryPublicId)
-    : thumbnailUrl;
+  const finalThumbnailUrl = thumb || (publicId
+    ? getCloudinaryVideoThumbnail(publicId)
+    : thumbnailUrl);
 
   // Debug logging
   console.log('VideoPlayer Debug:', {
+    cldPublicId,
     cloudinaryPublicId,
+    publicId,
     videoUrl,
     thumbnailUrl,
+    thumb,
     finalVideoUrl,
     finalThumbnailUrl
   });
 
   // Validation - show placeholder for missing video
-  if (!finalVideoUrl && !cloudinaryPublicId && !videoUrl) {
+  if (!finalVideoUrl && !publicId && !videoUrl) {
     return (
       <Box 
         sx={{ 
@@ -144,7 +153,7 @@ export default function VideoPlayer({
           Video đang xử lý hoặc chưa upload
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-          CloudinaryID: {cloudinaryPublicId || 'Không có'}
+          PublicID: {publicId || 'Không có'}
         </Typography>
         <Typography variant="caption" color="text.secondary">
           VideoURL: {videoUrl || 'Không có'}
