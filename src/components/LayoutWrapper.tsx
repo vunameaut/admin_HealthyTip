@@ -3,11 +3,17 @@ import DashboardLayout from './DashboardLayout';
 
 interface LayoutWrapperProps {
   children: React.ReactNode;
+  darkMode?: boolean;
+  toggleDarkMode?: () => void;
 }
 
-export default function LayoutWrapper({ children }: LayoutWrapperProps) {
+export default function LayoutWrapper({ 
+  children, 
+  darkMode, 
+  toggleDarkMode 
+}: LayoutWrapperProps) {
   return (
-    <DashboardLayout>
+    <DashboardLayout darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
       {children}
     </DashboardLayout>
   );

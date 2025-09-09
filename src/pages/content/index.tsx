@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import {
   Box,
   Grid,
@@ -59,7 +60,13 @@ import { healthTipsService, categoriesService, analyticsService } from '../../se
 import { HealthTip, Category, FilterOptions } from '../../types';
 import toast from 'react-hot-toast';
 
-export default function ContentManagement() {
+interface ContentManagementPageProps {
+  darkMode: boolean;
+  toggleDarkMode: () => void;
+}
+
+export default function ContentManagement({ darkMode, toggleDarkMode }: ContentManagementPageProps) {
+  const router = useRouter();
   const [healthTips, setHealthTips] = useState<HealthTip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -284,7 +291,7 @@ export default function ContentManagement() {
       renderCell: (params) => (
         <Box>
           <Tooltip title="Chỉnh sửa">
-            <IconButton size="small" onClick={() => window.open(`/content/edit/${params.row.id}`, '_blank')}>
+            <IconButton size="small" onClick={() => router.push(`/content/edit/${params.row.id}`)}>
               <Edit fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -303,7 +310,7 @@ export default function ContentManagement() {
 
   return (
     <AuthGuard>
-      <LayoutWrapper>
+      <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
         <Box p={3}>
           {/* Header */}
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>

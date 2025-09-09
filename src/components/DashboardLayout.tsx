@@ -61,32 +61,22 @@ const drawerWidth = 240;
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  darkMode?: boolean;
+  toggleDarkMode?: () => void;
 }
 
 export default function DashboardLayout({
   children,
+  darkMode = false,
+  toggleDarkMode = () => {},
 }: DashboardLayoutProps) {
   const { currentUser } = useCurrentUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({});
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('darkMode') === 'true';
-    }
-    return false;
-  });
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('darkMode', newDarkMode.toString());
-    }
-  };
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import {
   Box,
   Grid,
@@ -57,8 +58,10 @@ import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import { useDropzone } from 'react-dropzone';
 import LayoutWrapper from '../../components/LayoutWrapper';
 import AuthGuard from '../../components/AuthGuard';
+import VideoPlayer from '../../components/VideoPlayer';
 import { videosService, categoriesService } from '../../services/firebase';
 import { ShortVideo, Category, FilterOptions } from '../../types';
+import { getCloudinaryVideoThumbnail, getCloudinaryVideoUrl, uploadVideoToCloudinary } from '../../utils/cloudinary';
 import toast from 'react-hot-toast';
 
 interface VideoStats {
@@ -68,7 +71,13 @@ interface VideoStats {
   totalViews: number;
 }
 
-export default function VideoManagement() {
+interface VideoManagementPageProps {
+  darkMode: boolean;
+  toggleDarkMode: () => void;
+}
+
+export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManagementPageProps) {
+  const router = useRouter();
   const [videos, setVideos] = useState<ShortVideo[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [videoStats, setVideoStats] = useState<VideoStats>({
@@ -143,32 +152,41 @@ export default function VideoManagement() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
-        // Here you would integrate with Cloudinary upload
-        // For now, we'll simulate the upload process
-        
-        // Simulate upload progress
-        for (let progress = 0; progress <= 100; progress += 10) {
-          setUploadProgress(progress);
-          await new Promise(resolve => setTimeout(resolve, 200));
+        try {
+          // Upload to Cloudinary
+          const uploadResult = await uploadVideoToCloudinary(file, {
+            folder: 'health_videos',
+            uploadPreset: 'health_videos',
+            onProgress: (progress) => {
+              setUploadProgress((i / files.length * 100) + (progress / files.length));
+            }
+          });
+          
+          // Create video record in Firebase
+          const newVideo: Omit<ShortVideo, 'id'> = {
+            title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
+            caption: '',
+            videoUrl: uploadResult.secure_url,
+            thumbnailUrl: uploadResult.thumbnail_url,
+            cloudinaryPublicId: uploadResult.public_id,
+            categoryId: categories[0]?.id || '',
+            viewCount: 0,
+            likeCount: 0,
+            userId: 'admin', // Would be current user
+            status: 'published',
+            uploadDate: Date.now(),
+            duration: uploadResult.duration || 0,
+            width: uploadResult.width || 0,
+            height: uploadResult.height || 0
+          };
+          
+          // Add to database
+          await videosService.create(newVideo);
+          
+        } catch (uploadError) {
+          console.error(`Error uploading ${file.name}:`, uploadError);
+          toast.error(`Lỗi tải lên ${file.name}`);
         }
-        
-        // Create video record in Firebase
-        const newVideo: Omit<ShortVideo, 'id'> = {
-          title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
-          caption: '',
-          videoUrl: '', // Would be set from Cloudinary response
-          thumbnailUrl: '', // Would be generated automatically
-          categoryId: categories[0]?.id || '',
-          viewCount: 0,
-          likeCount: 0,
-          userId: 'admin', // Would be current user
-          status: 'processing',
-          uploadDate: Date.now(),
-          duration: 0 // Would be extracted from video
-        };
-        
-        // Add to database (mock for now)
-        console.log('Would upload video:', newVideo);
       }
       
       toast.success(`Đã tải lên ${files.length} video thành công`);
@@ -240,17 +258,23 @@ export default function VideoManagement() {
       headerName: 'Thumbnail',
       width: 120,
       sortable: false,
-      renderCell: (params) => (
-        <Avatar
-          variant="rounded"
-          src={params.value}
-          sx={{ width: 80, height: 60 }}
-          onClick={() => handleViewVideo(params.row)}
-          style={{ cursor: 'pointer' }}
-        >
-          <PlayArrow />
-        </Avatar>
-      )
+      renderCell: (params) => {
+        const thumbnailUrl = params.row.cloudinaryPublicId 
+          ? getCloudinaryVideoThumbnail(params.row.cloudinaryPublicId, { width: 160, height: 120 })
+          : params.value;
+        
+        return (
+          <Avatar
+            variant="rounded"
+            src={thumbnailUrl}
+            sx={{ width: 80, height: 60 }}
+            onClick={() => handleViewVideo(params.row)}
+            style={{ cursor: 'pointer' }}
+          >
+            <PlayArrow />
+          </Avatar>
+        );
+      }
     },
     {
       field: 'title',
@@ -351,7 +375,7 @@ export default function VideoManagement() {
             </IconButton>
           </Tooltip>
           <Tooltip title="Chỉnh sửa">
-            <IconButton size="small">
+            <IconButton size="small" onClick={() => router.push(`/videos/edit/${params.row.id}`)}>
               <Edit fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -394,7 +418,7 @@ export default function VideoManagement() {
 
   return (
     <AuthGuard>
-      <LayoutWrapper>
+      <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
         <Box p={3}>
           {/* Header */}
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -589,29 +613,15 @@ export default function VideoManagement() {
                 <Box>
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <Box
-                        sx={{
-                          width: '100%',
-                          height: 200,
-                          bgcolor: 'grey.200',
-                          borderRadius: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        {selectedVideo.videoUrl ? (
-                          <video 
-                            controls 
-                            style={{ width: '100%', height: '100%', borderRadius: 4 }}
-                            poster={selectedVideo.thumbnailUrl}
-                          >
-                            <source src={selectedVideo.videoUrl} type="video/mp4" />
-                          </video>
-                        ) : (
-                          <PlayArrow sx={{ fontSize: 48, color: 'text.secondary' }} />
-                        )}
-                      </Box>
+                      <VideoPlayer
+                        videoUrl={selectedVideo.videoUrl}
+                        cloudinaryPublicId={selectedVideo.cloudinaryPublicId}
+                        thumbnailUrl={selectedVideo.thumbnailUrl}
+                        title={selectedVideo.title}
+                        width="100%"
+                        height={200}
+                        controls={true}
+                      />
                     </Grid>
                     <Grid item xs={12} md={6}>
                       <Typography variant="h6" gutterBottom>{selectedVideo.title}</Typography>

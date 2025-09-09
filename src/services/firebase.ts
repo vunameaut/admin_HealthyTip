@@ -210,6 +210,55 @@ export class VideosService {
     }
   }
 
+  async getById(id: string): Promise<ShortVideo | null> {
+    try {
+      const videoRef = ref(database, `${this.basePath}/${id}`);
+      const snapshot = await get(videoRef);
+      
+      if (!snapshot.exists()) return null;
+      
+      return {
+        id,
+        ...snapshot.val()
+      };
+    } catch (error) {
+      console.error('Error fetching video:', error);
+      throw error;
+    }
+  }
+
+  async create(video: Omit<ShortVideo, 'id'>): Promise<string> {
+    try {
+      const videosRef = ref(database, this.basePath);
+      const newVideoRef = push(videosRef);
+      await set(newVideoRef, video);
+      return newVideoRef.key!;
+    } catch (error) {
+      console.error('Error creating video:', error);
+      throw error;
+    }
+  }
+
+  async update(id: string, video: Partial<ShortVideo>): Promise<void> {
+    try {
+      const videoRef = ref(database, `${this.basePath}/${id}`);
+      await update(videoRef, video);
+    } catch (error) {
+      console.error('Error updating video:', error);
+      throw error;
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    try {
+      const videoRef = ref(database, `${this.basePath}/${id}`);
+      await remove(videoRef);
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      throw error;
+    }
+  }
+
   async incrementViewCount(id: string): Promise<void> {
     try {
       const videoRef = ref(database, `${this.basePath}/${id}/viewCount`);

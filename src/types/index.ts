@@ -57,6 +57,7 @@ export interface ShortVideo {
   uploadDate: number;
   videoUrl: string;
   thumbnailUrl: string;
+  cloudinaryPublicId?: string; // For Cloudinary integration
   categoryId: string;
   tags?: Record<string, boolean>;
   viewCount: number;
@@ -64,6 +65,9 @@ export interface ShortVideo {
   userId: string;
   status?: 'draft' | 'published' | 'archived' | 'processing' | 'failed';
   duration?: number;
+  width?: number; // Video dimensions
+  height?: number;
+  updatedAt?: number; // Add this field
 }
 
 export interface Reminder {

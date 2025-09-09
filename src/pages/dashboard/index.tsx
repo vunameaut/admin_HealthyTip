@@ -35,7 +35,12 @@ import { ref, get } from 'firebase/database';
 import { HealthTip, ShortVideo, Analytics } from '@/types';
 import toast from 'react-hot-toast';
 
-export default function DashboardPage() {
+interface DashboardPageProps {
+  darkMode?: boolean;
+  toggleDarkMode?: () => void;
+}
+
+export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPageProps) {
   const { currentUser, loading: userLoading } = useCurrentUser();
   const [analytics, setAnalytics] = useState<Partial<Analytics>>({});
   const [recentHealthTips, setRecentHealthTips] = useState<HealthTip[]>([]);
@@ -166,7 +171,7 @@ export default function DashboardPage() {
 
   return (
     <AuthGuard>
-      <LayoutWrapper>
+      <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
         <Box sx={{ 
           flexGrow: 1, 
           p: 3,
