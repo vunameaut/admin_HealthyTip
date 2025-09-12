@@ -78,7 +78,7 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
 
   useEffect(() => {
     loadData();
-  }, [filters]);
+  }, [filters, searchQuery]);
 
   const loadData = async () => {
     try {
@@ -88,13 +88,15 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
         categoriesService.getAll()
       ]);
       
-      // Filter by search query
       let filteredTips = tips;
       if (searchQuery) {
-        filteredTips = tips.filter(tip => 
-          tip.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          tip.content.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        filteredTips = tips.filter(tip => {
+          const contentString = Array.isArray(tip.content)
+            ? tip.content.filter(block => block.type === 'text').map(block => block.value).join(' ')
+            : tip.content;
+          return tip.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                 contentString.toLowerCase().includes(searchQuery.toLowerCase());
+        });
       }
       
       setHealthTips(filteredTips);
@@ -180,7 +182,9 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
     const dataToExport = healthTips.map(tip => ({
       id: tip.id,
       title: tip.title,
-      content: tip.content,
+      content: Array.isArray(tip.content)
+        ? tip.content.map(block => `[${block.type}] ${block.value}`).join('\n\n')
+        : tip.content,
       category: categories.find(c => c.id === tip.categoryId)?.name || '',
       status: tip.status,
       viewCount: tip.viewCount,
@@ -222,13 +226,11 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
 
       for (const item of importedData) {
         try {
-          // Validate required fields
           if (!item.title || !item.content) {
             errorCount++;
             continue;
           }
 
-          // Find category by name if provided
           let categoryId = '';
           if (item.category) {
             const category = categories.find(c => c.name === item.category);
@@ -237,7 +239,7 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
 
           const healthTipData = {
             title: item.title,
-            content: item.content,
+            content: [{ type: 'text', value: item.content }], // Convert to block format
             categoryId: categoryId,
             status: item.status || 'draft',
             author: item.author || 'Imported',
@@ -248,7 +250,7 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
             isFeature: item.isFeature || false
           };
 
-          await healthTipsService.create(healthTipData);
+          await healthTipsService.create(healthTipData as Omit<HealthTip, 'id'>);
           successCount++;
         } catch (error) {
           console.error('Error importing item:', error);
@@ -263,7 +265,6 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
       toast.error('File không đúng định dạng hoặc bị lỗi. Vui lòng kiểm tra lại.');
     } finally {
       setLoading(false);
-      // Reset file input
       event.target.value = '';
     }
   };
@@ -411,7 +412,7 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
               <Button
                 variant="contained"
                 startIcon={<Add />}
-                onClick={() => window.open('/content/create', '_blank')}
+                onClick={() => router.push('/content/create')}
               >
                 Tạo bài viết
               </Button>
@@ -482,7 +483,7 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
             <Alert 
               severity="info" 
               sx={{ mb: 2 }}
-              action={
+              action={ 
                 <Button
                   size="small"
                   onClick={(e) => setBulkActionMenuAnchor(e.currentTarget)}
@@ -553,7 +554,7 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
             color="primary"
             aria-label="add"
             sx={{ position: 'fixed', bottom: 16, right: 16 }}
-            onClick={() => window.open('/content/create', '_blank')}
+            onClick={() => router.push('/content/create')}
           >
             <Add />
           </Fab>

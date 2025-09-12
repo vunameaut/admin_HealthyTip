@@ -14,10 +14,21 @@ export interface User {
   role?: 'admin' | 'editor' | 'moderator' | 'analyst' | 'viewer';
 }
 
+export interface ContentBlock {
+  id: string;
+  type: 'text' | 'image' | 'heading' | 'quote';
+  content: string;
+  metadata?: {
+    level?: 1 | 2 | 3 | 4 | 5 | 6; // For headings
+    alt?: string; // For images
+    caption?: string; // For images
+  };
+}
+
 export interface HealthTip {
   id: string;
   title: string;
-  content: string;
+  content: ContentBlock[] | Array<{ type: 'text' | 'image'; value: string; }>; // Support both formats for backward compatibility
   categoryId: string;
   categoryName?: string;
   viewCount: number;
@@ -37,6 +48,7 @@ export interface HealthTip {
   seoDescription?: string;
   scheduledAt?: number;
   slug?: string;
+  updatedAt?: number;
 }
 
 export interface Category {
@@ -59,6 +71,7 @@ export interface ShortVideo {
   thumbnailUrl: string;
   cloudinaryPublicId?: string; // For Cloudinary integration
   cldPublicId?: string; // Alternative naming for Cloudinary public ID
+  cldVersion?: number; // Cloudinary version for URL generation
   thumb?: string; // Thumbnail URL from data
   categoryId: string;
   tags?: Record<string, boolean>;

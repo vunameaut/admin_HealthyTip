@@ -275,6 +275,15 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [userToBan, setUserToBan] = useState<string | null>(null);
 
+  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+  const [newVideoData, setNewVideoData] = useState({
+    title: '',
+    caption: '',
+    categoryId: '',
+    status: 'draft',
+    tags: '',
+  });
+
   useEffect(() => {
     loadData();
   }, []);
@@ -289,10 +298,13 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
       
       setVideos(vids);
       setCategories(cats);
+      if (cats.length > 0 && !newVideoData.categoryId) {
+        setNewVideoData(prev => ({ ...prev, categoryId: cats[0].id }));
+      }
       calculateStats(vids);
     } catch (error) {
-      console.error('Error loading videos:', error);
-      toast.error('Có lỗi xảy ra khi tải dữ liệu video');
+      console.error('Error loading data:', error);
+      toast.error('Có lỗi xảy ra khi tải dữ liệu');
     } finally {
       setLoading(false);
     }
@@ -321,46 +333,79 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
     });
   };
 
-  const handleVideoUpload = async (files: File[]) => {
+  const handleCloseUploadDialog = () => {
+    setUploadDialogOpen(false);
+    setFilesToUpload([]);
+    setNewVideoData({
+      title: '',
+      caption: '',
+      categoryId: categories.length > 0 ? categories[0].id : '',
+      status: 'draft',
+      tags: '',
+    });
+  };
+
+  const handleVideoUpload = async () => {
+    if (filesToUpload.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một file video');
+      return;
+    }
+    if (!newVideoData.title) {
+      toast.error('Vui lòng nhập tiêu đề');
+      return;
+    }
+    if (!newVideoData.categoryId) {
+      toast.error('Vui lòng chọn danh mục');
+      return;
+    }
+
     try {
       setUploading(true);
       setUploadProgress(0);
       
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
         
         try {
           // Upload to Cloudinary
           const uploadResult = await uploadVideoToCloudinary(file, {
             folder: 'health_videos',
             onProgress: (progress) => {
-              setUploadProgress((i / files.length * 100) + (progress / files.length));
+              setUploadProgress((i / filesToUpload.length * 100) + (progress / filesToUpload.length));
             }
           });
           
-          console.log('Upload result:', uploadResult); // Debug log
-          
           // Create video record in Firebase
+          // Generate thumbnail URL
+          const thumbnailUrl = getCloudinaryVideoThumbnail(uploadResult.public_id);
+          
           const newVideo: Omit<ShortVideo, 'id'> = {
-            title: file.name.replace(/\.[^/.]+$/, ""), // Remove extension
-            caption: '',
+            title: newVideoData.title || file.name.replace(/\.[^/.]+$/, ""),
+            caption: newVideoData.caption,
             videoUrl: uploadResult.secure_url,
-            thumbnailUrl: uploadResult.thumbnail_url,
-            cloudinaryPublicId: uploadResult.public_id,
-            categoryId: categories[0]?.id || '',
+            thumbnailUrl: thumbnailUrl,
+            thumb: thumbnailUrl, // Save thumb URL to match data structure
+            cldPublicId: uploadResult.public_id, // Use cldPublicId for consistency
+            cldVersion: Date.now(), // Add version for Cloudinary URL generation
+            categoryId: newVideoData.categoryId,
             viewCount: 0,
             likeCount: 0,
             userId: 'admin', // Would be current user
-            status: 'published',
+            status: newVideoData.status as 'draft' | 'published',
             uploadDate: Date.now(),
+            updatedAt: Date.now(),
             duration: uploadResult.duration || 0,
             width: uploadResult.width || 0,
-            height: uploadResult.height || 0
+            height: uploadResult.height || 0,
+            tags: newVideoData.tags.split(',').reduce((acc: Record<string, boolean>, tag) => {
+              const trimmedTag = tag.trim();
+              if (trimmedTag) {
+                acc[trimmedTag] = true;
+              }
+              return acc;
+            }, {}),
           };
           
-          console.log('New video data:', newVideo); // Debug log
-          
-          // Add to database
           await videosService.create(newVideo);
           
         } catch (uploadError) {
@@ -369,8 +414,8 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
         }
       }
       
-      toast.success(`Đã tải lên ${files.length} video thành công`);
-      setUploadDialogOpen(false);
+      toast.success(`Đã tải lên ${filesToUpload.length} video thành công`);
+      handleCloseUploadDialog();
       loadData();
     } catch (error) {
       console.error('Error uploading videos:', error);
@@ -384,7 +429,13 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const videoFiles = acceptedFiles.filter(file => file.type.startsWith('video/'));
     if (videoFiles.length > 0) {
-      handleVideoUpload(videoFiles);
+      setFilesToUpload(videoFiles);
+      if (videoFiles.length === 1) {
+        setNewVideoData(prev => ({
+          ...prev,
+          title: videoFiles[0].name.replace(/\.[^/.]+$/, ""),
+        }));
+      }
     } else {
       toast.error('Vui lòng chọn file video hợp lệ');
     }
@@ -419,7 +470,7 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
   };
 
   const handleViewVideo = (video: ShortVideo) => {
-    console.log('Opening video dialog for:', video); // Debug log
+    console.log('Opening video dialog for:', video);
     setSelectedVideo(video);
     setVideoDetailOpen(true);
   };
@@ -1053,43 +1104,118 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
           {/* Upload Dialog */}
           <Dialog 
             open={uploadDialogOpen} 
-            onClose={() => setUploadDialogOpen(false)}
+            onClose={handleCloseUploadDialog}
             maxWidth="md"
             fullWidth
           >
             <DialogTitle>Tải lên Video</DialogTitle>
             <DialogContent>
-              <Box {...getRootProps()} sx={{
-                border: '2px dashed #ccc',
-                borderRadius: 2,
-                p: 4,
-                textAlign: 'center',
-                cursor: 'pointer',
-                bgcolor: isDragActive ? 'action.hover' : 'background.paper',
-                mt: 2
-              }}>
-                <input {...getInputProps()} />
-                <CloudUpload sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
-                  {isDragActive ? 'Thả file vào đây...' : 'Kéo thả video hoặc click để chọn'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Hỗ trợ: MP4, MOV, AVI, MKV, WebM
-                </Typography>
-              </Box>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <Box {...getRootProps()} sx={{
+                    border: '2px dashed #ccc',
+                    borderRadius: 2,
+                    p: 4,
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    bgcolor: isDragActive ? 'action.hover' : 'background.paper',
+                  }}>
+                    <input {...getInputProps()} />
+                    <CloudUpload sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                    <Typography variant="h6" gutterBottom>
+                      {isDragActive ? 'Thả file vào đây...' : 'Kéo thả video hoặc click để chọn'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Hỗ trợ: MP4, MOV, AVI, MKV, WebM
+                    </Typography>
+                    {filesToUpload.length > 0 && (
+                      <Box mt={2}>
+                        <Typography variant="subtitle1">File đã chọn:</Typography>
+                        <List>
+                          {filesToUpload.map(file => (
+                            <ListItem key={file.name}>
+                              <ListItemText primary={file.name} secondary={`${(file.size / 1024 / 1024).toFixed(2)} MB`} />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Box>
+                    )}
+                  </Box>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Tiêu đề"
+                    value={newVideoData.title}
+                    onChange={(e) => setNewVideoData({ ...newVideoData, title: e.target.value })}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Mô tả"
+                    multiline
+                    rows={4}
+                    value={newVideoData.caption}
+                    onChange={(e) => setNewVideoData({ ...newVideoData, caption: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Danh mục</InputLabel>
+                    <Select
+                      value={newVideoData.categoryId}
+                      onChange={(e) => setNewVideoData({ ...newVideoData, categoryId: e.target.value })}
+                      label="Danh mục"
+                    >
+                      {categories.map(cat => (
+                        <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Trạng thái</InputLabel>
+                    <Select
+                      value={newVideoData.status}
+                      onChange={(e) => setNewVideoData({ ...newVideoData, status: e.target.value })}
+                      label="Trạng thái"
+                    >
+                      <MenuItem value="draft">Bản nháp</MenuItem>
+                      <MenuItem value="published">Xuất bản</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Tags (phân cách bởi dấu phẩy)"
+                    value={newVideoData.tags}
+                    onChange={(e) => setNewVideoData({ ...newVideoData, tags: e.target.value })}
+                    placeholder="suckhoe, dinhduong, thethanh"
+                    helperText="Ví dụ: suckhoe, dinhduong, thethanh"
+                  />
+                </Grid>
+              </Grid>
               
               {uploading && (
                 <Box mt={2}>
                   <Typography variant="body2" gutterBottom>
-                    Đang tải lên... {uploadProgress}%
+                    Đang tải lên... {Math.round(uploadProgress)}%
                   </Typography>
                   <LinearProgress variant="determinate" value={uploadProgress} />
                 </Box>
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
+              <Button onClick={handleCloseUploadDialog} disabled={uploading}>
                 Hủy
+              </Button>
+              <Button onClick={handleVideoUpload} variant="contained" disabled={uploading || filesToUpload.length === 0}>
+                {uploading ? 'Đang tải lên...' : `Tải lên ${filesToUpload.length} video`}
               </Button>
             </DialogActions>
           </Dialog>

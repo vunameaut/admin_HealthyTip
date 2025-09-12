@@ -20,6 +20,7 @@ import {
   FormControlLabel,
   Paper,
   Divider,
+  IconButton
 } from '@mui/material';
 import {
   Save,
@@ -30,6 +31,9 @@ import {
   Article,
   Image,
   VideoLibrary,
+  ArrowUpward,
+  ArrowDownward,
+  TextFields
 } from '@mui/icons-material';
 import LayoutWrapper from '../../../components/LayoutWrapper';
 import AuthGuard, { useCurrentUser } from '../../../components/AuthGuard';
@@ -50,18 +54,18 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
   const [saving, setSaving] = useState(false);
   const [healthTip, setHealthTip] = useState<HealthTip | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    summary: '',
-    category: '',
-    tags: [] as string[],
-    imageUrl: '',
-    videoUrl: '',
-    author: '',
-    isFeature: false,
-    status: 'published' as 'draft' | 'published' | 'archived',
-  });
+  
+  // State for the form
+  const [title, setTitle] = useState('');
+  const [summary, setSummary] = useState('');
+  const [blocks, setBlocks] = useState<Array<{ type: 'text' | 'image'; value: string; }>>([]);
+  const [category, setCategory] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [imageUrl, setImageUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [author, setAuthor] = useState('');
+  const [isFeature, setIsFeature] = useState(false);
+  const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
   const [newTag, setNewTag] = useState('');
 
   useEffect(() => {
@@ -80,18 +84,21 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
       
       if (data) {
         setHealthTip(data);
-        setFormData({
-          title: data.title || '',
-          content: data.content || '',
-          summary: data.summary || '',
-          category: data.category || '',
-          tags: data.tags || [],
-          imageUrl: data.imageUrl || '',
-          videoUrl: data.videoUrl || '',
-          author: data.author || '',
-          isFeature: data.isFeature || false,
-          status: data.status || 'published',
-        });
+        setTitle(data.title || '');
+        setSummary(data.summary || '');
+        // Handle both old string content and new block content
+        if (typeof data.content === 'string') {
+          setBlocks([{ type: 'text', value: data.content }]);
+        } else if (Array.isArray(data.content)) {
+          setBlocks(data.content);
+        }
+        setCategory(data.category || '');
+        setTags(data.tags || []);
+        setImageUrl(data.imageUrl || '');
+        setVideoUrl(data.videoUrl || '');
+        setAuthor(data.author || '');
+        setIsFeature(data.isFeature || false);
+        setStatus(data.status || 'published');
       } else {
         toast.error('Không tìm thấy bài viết');
         router.push('/content');
@@ -115,8 +122,8 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
 
   const handleSave = async () => {
     try {
-      if (!formData.title.trim() || !formData.content.trim()) {
-        toast.error('Vui lòng nhập đầy đủ tiêu đề và nội dung');
+      if (!title.trim()) {
+        toast.error('Vui lòng nhập đầy đủ tiêu đề');
         return;
       }
 
@@ -124,11 +131,17 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
       const now = Date.now();
       const updatedData = {
         ...healthTip,
-        ...formData,
+        title: title.trim(),
+        summary: summary.trim(),
+        content: blocks,
+        category,
+        tags,
+        imageUrl,
+        videoUrl,
+        author,
+        isFeature,
+        status,
         updatedAt: now,
-        title: formData.title.trim(),
-        content: formData.content.trim(),
-        summary: formData.summary.trim(),
       };
 
       await healthTipsService.update(id as string, updatedData);
@@ -161,20 +174,45 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
   };
 
   const handleAddTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }));
+    if (newTag.trim() && !tags.includes(newTag.trim())) {
+      setTags([...tags, newTag.trim()]);
       setNewTag('');
     }
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleAddBlock = (type: 'text' | 'image') => {
+    setBlocks([...blocks, { type, value: '' }]);
+  };
+
+  const handleRemoveBlock = (index: number) => {
+    const newBlocks = [...blocks];
+    newBlocks.splice(index, 1);
+    setBlocks(newBlocks);
+  };
+
+  const handleMoveBlock = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === blocks.length - 1)
+    ) {
+      return;
+    }
+    const newBlocks = [...blocks];
+    const block = newBlocks[index];
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    newBlocks[index] = newBlocks[swapIndex];
+    newBlocks[swapIndex] = block;
+    setBlocks(newBlocks);
+  };
+
+  const handleBlockChange = (index: number, value: string) => {
+    const newBlocks = [...blocks];
+    newBlocks[index].value = value;
+    setBlocks(newBlocks);
   };
 
   if (userLoading || !currentUser) {
@@ -268,15 +306,11 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
             <Grid item xs={12} md={8}>
               <Card>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Nội dung chính
-                  </Typography>
-                  
                   <Stack spacing={3}>
                     <TextField
                       label="Tiêu đề"
-                      value={formData.title}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
                       fullWidth
                       required
                       variant="outlined"
@@ -284,24 +318,65 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                     
                     <TextField
                       label="Tóm tắt"
-                      value={formData.summary}
-                      onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
+                      value={summary}
+                      onChange={(e) => setSummary(e.target.value)}
                       fullWidth
                       multiline
                       rows={2}
                       variant="outlined"
                     />
                     
-                    <TextField
-                      label="Nội dung"
-                      value={formData.content}
-                      onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-                      fullWidth
-                      multiline
-                      rows={10}
-                      required
-                      variant="outlined"
-                    />
+                    <Divider />
+
+                    <Typography variant="h6">Nội dung</Typography>
+
+                    {blocks.map((block, index) => (
+                      <Paper key={index} variant="outlined" sx={{ p: 2 }}>
+                        <Grid container spacing={1} alignItems="center">
+                          <Grid item xs={10}>
+                            {block.type === 'text' ? (
+                              <TextField
+                                label={`Khối văn bản #${index + 1}`}
+                                value={block.value}
+                                onChange={(e) => handleBlockChange(index, e.target.value)}
+                                fullWidth
+                                multiline
+                                rows={4}
+                              />
+                            ) : (
+                              <Stack spacing={1}>
+                                <TextField
+                                  label={`URL hình ảnh #${index + 1}`}
+                                  value={block.value}
+                                  onChange={(e) => handleBlockChange(index, e.target.value)}
+                                  fullWidth
+                                />
+                                {block.value && <img src={block.value} alt={`Block ${index + 1}`} style={{ width: '100%', maxHeight: 200, objectFit: 'contain' }} />}
+                              </Stack>
+                            )}
+                          </Grid>
+                          <Grid item xs={2}>
+                            <Stack>
+                              <IconButton onClick={() => handleMoveBlock(index, 'up')} disabled={index === 0}>
+                                <ArrowUpward />
+                              </IconButton>
+                              <IconButton onClick={() => handleMoveBlock(index, 'down')} disabled={index === blocks.length - 1}>
+                                <ArrowDownward />
+                              </IconButton>
+                              <IconButton onClick={() => handleRemoveBlock(index)} color="error">
+                                <Delete />
+                              </IconButton>
+                            </Stack>
+                          </Grid>
+                        </Grid>
+                      </Paper>
+                    ))}
+
+                    <Stack direction="row" spacing={2}>
+                      <Button onClick={() => handleAddBlock('text')} startIcon={<TextFields />}>Thêm văn bản</Button>
+                      <Button onClick={() => handleAddBlock('image')} startIcon={<Image />}>Thêm hình ảnh</Button>
+                    </Stack>
+
                   </Stack>
                 </CardContent>
               </Card>
@@ -321,8 +396,8 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                       <FormControl fullWidth>
                         <InputLabel>Trạng thái xuất bản</InputLabel>
                         <Select
-                          value={formData.status}
-                          onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                          value={status}
+                          onChange={(e) => setStatus(e.target.value as any)}
                           label="Trạng thái xuất bản"
                         >
                           <MenuItem value="draft">Bản nháp</MenuItem>
@@ -334,8 +409,8 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                       <FormControlLabel
                         control={
                           <Switch
-                            checked={formData.isFeature}
-                            onChange={(e) => setFormData(prev => ({ ...prev, isFeature: e.target.checked }))}
+                            checked={isFeature}
+                            onChange={(e) => setIsFeature(e.target.checked)}
                           />
                         }
                         label="Bài viết nổi bật"
@@ -355,14 +430,14 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                       <FormControl fullWidth>
                         <InputLabel>Danh mục</InputLabel>
                         <Select
-                          value={formData.category}
-                          onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value)}
                           label="Danh mục"
                         >
                           <MenuItem value="">Chọn danh mục</MenuItem>
-                          {categories.map((category) => (
-                            <MenuItem key={category.id} value={category.name}>
-                              {category.name}
+                          {categories.map((cat) => (
+                            <MenuItem key={cat.id} value={cat.name}>
+                              {cat.name}
                             </MenuItem>
                           ))}
                         </Select>
@@ -370,8 +445,8 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                       
                       <TextField
                         label="Tác giả"
-                        value={formData.author}
-                        onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
+                        value={author}
+                        onChange={(e) => setAuthor(e.target.value)}
                         fullWidth
                         variant="outlined"
                       />
@@ -406,7 +481,7 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                       </Box>
                       
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {formData.tags.map((tag, index) => (
+                        {tags.map((tag, index) => (
                           <Chip
                             key={index}
                             label={tag}
@@ -431,8 +506,8 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                     <Stack spacing={2}>
                       <TextField
                         label="URL hình ảnh"
-                        value={formData.imageUrl}
-                        onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
+                        value={imageUrl}
+                        onChange={(e) => setImageUrl(e.target.value)}
                         fullWidth
                         variant="outlined"
                         InputProps={{
@@ -442,8 +517,8 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                       
                       <TextField
                         label="URL video"
-                        value={formData.videoUrl}
-                        onChange={(e) => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
+                        value={videoUrl}
+                        onChange={(e) => setVideoUrl(e.target.value)}
                         fullWidth
                         variant="outlined"
                         InputProps={{
