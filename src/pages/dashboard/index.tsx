@@ -60,11 +60,11 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
     try {
       setLoading(true);
       
-      // Load analytics data
+      // Load analytics data - sử dụng đúng tên collection trong Firebase
       const [usersSnapshot, healthTipsSnapshot, videosSnapshot] = await Promise.all([
         get(ref(database, 'users')),
-        get(ref(database, 'healthTips')),
-        get(ref(database, 'shortVideos')),
+        get(ref(database, 'health_tips')), // Đổi từ 'healthTips' thành 'health_tips'
+        get(ref(database, 'videos')), // Đổi từ 'shortVideos' thành 'videos'
       ]);
 
       const users = usersSnapshot.val() || {};
@@ -76,16 +76,30 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
       const totalHealthTips = Object.keys(healthTips).length;
       const totalVideos = Object.keys(videos).length;
 
-      // Get recent content
+      // Get current timestamp and 7 days ago timestamp
+      const now = Date.now();
+      const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000); // 7 days in milliseconds
+
+      // Get recent content from last 7 days, max 50 items each
       const recentTips = Object.entries(healthTips)
         .map(([id, tip]: [string, any]) => ({ ...tip, id }))
+        .filter((tip: any) => tip.createdAt && tip.createdAt >= sevenDaysAgo)
         .sort((a: any, b: any) => b.createdAt - a.createdAt)
-        .slice(0, 5);
+        .slice(0, 50);
 
       const recentVids = Object.entries(videos)
         .map(([id, video]: [string, any]) => ({ ...video, id }))
-        .sort((a: any, b: any) => b.uploadDate - a.uploadDate)
-        .slice(0, 5);
+        .filter((video: any) => {
+          // Kiểm tra cả uploadDate và createdAt để tương thích
+          const videoDate = video.uploadDate || video.createdAt;
+          return videoDate && videoDate >= sevenDaysAgo;
+        })
+        .sort((a: any, b: any) => {
+          const dateA = a.uploadDate || a.createdAt;
+          const dateB = b.uploadDate || b.createdAt;
+          return dateB - dateA;
+        })
+        .slice(0, 50);
 
       setAnalytics({
         totalUsers,
@@ -298,9 +312,12 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
                   color: '#4CAF50'
                 }}>
                   <Article />
-                  Bài viết sức khỏe mới nhất
+                  Bài viết sức khỏe mới nhất (7 ngày gần đây)
                 </Typography>
-                <TableContainer>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                  Hiển thị tối đa 50 bài viết từ 7 ngày gần đây ({recentHealthTips.length} bài)
+                </Typography>
+                <TableContainer sx={{ maxHeight: 400 }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -311,37 +328,47 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {recentHealthTips.map((tip) => (
-                        <TableRow key={tip.id}>
-                          <TableCell>
-                            <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                              {tip.title}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              icon={<Visibility />}
-                              label={tip.viewCount}
-                              size="small"
-                              variant="outlined"
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              icon={<ThumbUp />}
-                              label={tip.likeCount}
-                              size="small"
-                              variant="outlined"
-                              color="primary"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="caption">
-                              {formatDate(tip.createdAt)}
+                      {recentHealthTips.length > 0 ? (
+                        recentHealthTips.map((tip) => (
+                          <TableRow key={tip.id}>
+                            <TableCell>
+                              <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                                {tip.title}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                icon={<Visibility />}
+                                label={tip.viewCount || 0}
+                                size="small"
+                                variant="outlined"
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                icon={<ThumbUp />}
+                                label={tip.likeCount || 0}
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="caption">
+                                {formatDate(tip.createdAt)}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} align="center">
+                            <Typography variant="body2" color="text.secondary">
+                              Không có bài viết mới trong 7 ngày gần đây
                             </Typography>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -369,9 +396,12 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
                   color: '#FF7043'
                 }}>
                   <VideoLibrary />
-                  Video sức khỏe mới nhất
+                  Video sức khỏe mới nhất (7 ngày gần đây)
                 </Typography>
-                <TableContainer>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                  Hiển thị tối đa 50 video từ 7 ngày gần đây ({recentVideos.length} video)
+                </Typography>
+                <TableContainer sx={{ maxHeight: 400 }}>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
@@ -382,37 +412,47 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {recentVideos.map((video) => (
-                        <TableRow key={video.id}>
-                          <TableCell>
-                            <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                              {video.title}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              icon={<Visibility />}
-                              label={video.viewCount}
-                              size="small"
-                              variant="outlined"
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              icon={<ThumbUp />}
-                              label={video.likeCount}
-                              size="small"
-                              variant="outlined"
-                              color="primary"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="caption">
-                              {formatDate(video.uploadDate)}
+                      {recentVideos.length > 0 ? (
+                        recentVideos.map((video) => (
+                          <TableRow key={video.id}>
+                            <TableCell>
+                              <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                                {video.title}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                icon={<Visibility />}
+                                label={video.viewCount || 0}
+                                size="small"
+                                variant="outlined"
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                icon={<ThumbUp />}
+                                label={video.likeCount || 0}
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="caption">
+                                {formatDate(video.uploadDate || video.createdAt)}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} align="center">
+                            <Typography variant="body2" color="text.secondary">
+                              Không có video mới trong 7 ngày gần đây
                             </Typography>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </TableContainer>

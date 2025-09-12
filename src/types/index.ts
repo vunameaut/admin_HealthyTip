@@ -67,6 +67,7 @@ export interface ShortVideo {
   title: string;
   caption: string;
   uploadDate: number;
+  createdAt?: number; // Add createdAt as optional for backward compatibility
   videoUrl: string;
   thumbnailUrl: string;
   cloudinaryPublicId?: string; // For Cloudinary integration
