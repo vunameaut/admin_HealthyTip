@@ -89,12 +89,15 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
         if (typeof data.content === 'string') {
           setBlocks([{ type: 'text', value: data.content }]);
         } else if (Array.isArray(data.content)) {
-          // New format is ContentBlock[], but old data might have 'content' property instead of 'value'
-          const convertedBlocks = data.content.map((block: any) => {
+          const convertedBlocks = data.content.reduce((acc: Array<{ type: 'text' | 'image'; value: string }>, block: any) => {
             const value = block.value || block.content || '';
-            const type = block.type === 'image' ? 'image' : 'text'; // Default to text
-            return { type, value };
-          }).filter(block => block.type === 'text' || block.type === 'image'); // Ensure only supported types
+            if (block.type === 'text' || block.type === 'image') {
+                acc.push({ type: block.type, value });
+            } else if (block.type === 'heading' || block.type === 'quote') { // handle other text-based types
+                acc.push({ type: 'text', value });
+            }
+            return acc;
+          }, []);
           setBlocks(convertedBlocks);
         }
         setCategory(data.categoryId || '');
