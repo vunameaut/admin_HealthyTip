@@ -57,7 +57,7 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
   
   // State for the form
   const [title, setTitle] = useState('');
-  const [summary, setSummary] = useState('');
+  const [excerpt, setExcerpt] = useState('');
   const [blocks, setBlocks] = useState<Array<{ type: 'text' | 'image'; value: string; }>>([]);
   const [category, setCategory] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -85,20 +85,30 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
       if (data) {
         setHealthTip(data);
         setTitle(data.title || '');
-        setSummary(data.summary || '');
+        setExcerpt(data.excerpt || '');
         // Handle both old string content and new block content
         if (typeof data.content === 'string') {
           setBlocks([{ type: 'text', value: data.content }]);
         } else if (Array.isArray(data.content)) {
-          setBlocks(data.content);
+          // Convert ContentBlock[] to { type, value }[] format
+          const convertedBlocks = data.content.map((block: any) => {
+            if ('content' in block) {
+              // ContentBlock format
+              return { type: block.type === 'text' ? 'text' : 'image', value: block.content };
+            } else {
+              // Already in { type, value } format
+              return block;
+            }
+          });
+          setBlocks(convertedBlocks);
         }
-        setCategory(data.category || '');
+        setCategory(data.categoryId || '');
         setTags(data.tags || []);
         setImageUrl(data.imageUrl || '');
-        setVideoUrl(data.videoUrl || '');
+        // videoUrl is not in HealthTip interface, skip it
         setAuthor(data.author || '');
         setIsFeature(data.isFeature || false);
-        setStatus(data.status || 'published');
+        setStatus((data.status as 'draft' | 'published' | 'archived') || 'published');
       } else {
         toast.error('Không tìm thấy bài viết');
         router.push('/content');
@@ -132,12 +142,11 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
       const updatedData = {
         ...healthTip,
         title: title.trim(),
-        summary: summary.trim(),
+        excerpt: excerpt.trim(),
         content: blocks,
-        category,
+        categoryId: category,
         tags,
         imageUrl,
-        videoUrl,
         author,
         isFeature,
         status,
@@ -318,8 +327,8 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                     
                     <TextField
                       label="Tóm tắt"
-                      value={summary}
-                      onChange={(e) => setSummary(e.target.value)}
+                      value={excerpt}
+                      onChange={(e) => setExcerpt(e.target.value)}
                       fullWidth
                       multiline
                       rows={2}
