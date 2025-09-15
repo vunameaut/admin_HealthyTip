@@ -25,13 +25,15 @@ import {
   Cancel,
   VideoLibrary,
   Add,
-  PlayArrow
+  PlayArrow,
+  Image,
+  Link
 } from '@mui/icons-material';
 import LayoutWrapper from '../../components/LayoutWrapper';
 import AuthGuard, { useCurrentUser } from '../../components/AuthGuard';
 import MediaUploadForm from '../../components/MediaUploadForm';
 import VideoPlayer from '../../components/VideoPlayer';
-import { categoriesService } from '../../services/firebase';
+import { categoriesService, videosService } from '../../services/firebase';
 import { Media } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -55,6 +57,13 @@ export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVide
   const [isFeature, setIsFeature] = useState(false);
   const [uploadedVideo, setUploadedVideo] = useState<Media | null>(null);
   const [showVideoUpload, setShowVideoUpload] = useState(true);
+  
+  // Thumbnail states
+  const [thumbnailType, setThumbnailType] = useState<'upload' | 'url'>('upload');
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [uploadedThumbnail, setUploadedThumbnail] = useState<Media | null>(null);
+  const [showThumbnailUpload, setShowThumbnailUpload] = useState(false);
+  const [thumbnailUrlError, setThumbnailUrlError] = useState('');
 
   useEffect(() => {
     loadCategories();
@@ -85,38 +94,68 @@ export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVide
       return;
     }
 
+    // Validate thumbnail
+    const finalThumbnailUrl = getThumbnailUrl();
+    if (!finalThumbnailUrl) {
+      toast.error('Vui lòng thêm thumbnail cho video (upload ảnh hoặc nhập link)');
+      return;
+    }
+
+    // Validate thumbnail URL if using URL method
+    if (thumbnailType === 'url' && thumbnailUrl.trim()) {
+      const isValidUrl = await validateThumbnailUrl(thumbnailUrl);
+      if (!isValidUrl) {
+        toast.error('Link thumbnail không hợp lệ');
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       const now = Date.now();
       
-      // Tạo short video record trong database
-      const newVideo = {
+      // Tạo short video record theo đúng interface ShortVideo
+      const newVideo: any = {
         title: title.trim(),
-        description: description.trim(),
+        caption: description.trim() || title.trim(),
         categoryId: category,
-        tags,
         status,
-        author: currentUser?.displayName || 'Admin',
+        userId: currentUser?.uid || 'demo_user',
+        uploadDate: now,
         createdAt: now,
         updatedAt: now,
-        publishedAt: status === 'published' ? now : undefined,
         viewCount: 0,
         likeCount: 0,
-        isFeature,
         videoUrl: uploadedVideo.secure_url,
-        thumbnailUrl: uploadedVideo.thumbnail_url,
+        thumbnailUrl: finalThumbnailUrl, // Required field
+        thumb: finalThumbnailUrl, // For compatibility with data sample
         duration: uploadedVideo.duration || 0,
-        mediaId: uploadedVideo.id,
-        uploader: currentUser?.uid || 'unknown'
+        width: uploadedVideo.width || 576,
+        height: uploadedVideo.height || 1024,
+        // Cloudinary info
+        cloudinaryPublicId: uploadedVideo.public_id,
+        cldPublicId: uploadedVideo.public_id,
+        cldVersion: uploadedVideo.version || Math.floor(Date.now() / 1000),
+        // Convert tags array to object
+        tags: tags.reduce((acc: any, tag: string) => {
+          acc[tag] = true;
+          return acc;
+        }, {}),
+        comments: {} // Initialize empty comments object
       };
 
+      // Only add publishedAt if status is published  
+      if (status === 'published') {
+        newVideo.publishedAt = now;
+      }
+
       // TODO: Create videoService similar to healthTipsService
-      // await videoService.create(newVideo);
+      const videoId = await videosService.create(newVideo);
       
-      console.log('Video data to save:', newVideo);
-      toast.success('Video đã được tạo thành công! (Chưa lưu database - cần tạo videoService)');
+      console.log('Video saved with ID:', videoId);
+      toast.success('Video đã được tạo thành công!');
       
-      // router.push('/videos');
+      router.push('/videos');
     } catch (error) {
       console.error('Error creating video:', error);
       toast.error('Có lỗi khi tạo video');
@@ -153,6 +192,69 @@ export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVide
       setShowVideoUpload(false);
       toast.success('Video upload thành công!');
     }
+  };
+
+  const handleThumbnailUploadComplete = (media: Media[]) => {
+    const imageFile = media.find(m => m.type === 'image');
+    if (imageFile) {
+      setUploadedThumbnail(imageFile);
+      setShowThumbnailUpload(false);
+      toast.success('Thumbnail upload thành công!');
+    }
+  };
+
+  const validateThumbnailUrl = async (url: string): Promise<boolean> => {
+    if (!url.trim()) {
+      setThumbnailUrlError('');
+      return true;
+    }
+
+    try {
+      // Check if URL is valid format
+      new URL(url);
+      
+      // Try to load image to check if it exists
+      const img = document.createElement('img');
+      img.crossOrigin = 'anonymous';
+      
+      const loadPromise = new Promise<boolean>((resolve) => {
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+      });
+      
+      img.src = url;
+      const isValid = await loadPromise;
+      
+      if (!isValid) {
+        setThumbnailUrlError('Link ảnh không hợp lệ hoặc không thể truy cập');
+        return false;
+      }
+      
+      setThumbnailUrlError('');
+      return true;
+    } catch (error) {
+      setThumbnailUrlError('Link không hợp lệ');
+      return false;
+    }
+  };
+
+  const handleThumbnailUrlChange = async (url: string) => {
+    setThumbnailUrl(url);
+    if (url.trim()) {
+      await validateThumbnailUrl(url);
+    }
+  };
+
+  const getThumbnailUrl = (): string => {
+    if (thumbnailType === 'upload' && uploadedThumbnail) {
+      return uploadedThumbnail.secure_url;
+    } else if (thumbnailType === 'url' && thumbnailUrl.trim()) {
+      return thumbnailUrl;
+    } else if (uploadedVideo?.thumbnail_url) {
+      // Fallback to video thumbnail if available
+      return uploadedVideo.thumbnail_url;
+    }
+    return '';
   };
 
   return (
@@ -206,6 +308,132 @@ export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVide
                         placeholder="Mô tả ngắn về nội dung video..."
                       />
                     </Stack>
+                  </CardContent>
+                </Card>
+
+                {/* Thumbnail Card - Always show */}
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>Thumbnail Video</Typography>
+                    
+                    {/* Thumbnail Type Selection */}
+                    <FormControl component="fieldset" sx={{ mb: 2 }}>
+                      <Stack direction="row" spacing={2}>
+                        <Button
+                          variant={thumbnailType === 'upload' ? 'contained' : 'outlined'}
+                          onClick={() => setThumbnailType('upload')}
+                          size="small"
+                        >
+                          Upload Ảnh
+                        </Button>
+                        <Button
+                          variant={thumbnailType === 'url' ? 'contained' : 'outlined'}
+                          onClick={() => setThumbnailType('url')}
+                          size="small"
+                        >
+                          Nhập Link
+                        </Button>
+                      </Stack>
+                    </FormControl>
+
+                    {/* Upload Image Option */}
+                    {thumbnailType === 'upload' && (
+                      <Box>
+                        {!uploadedThumbnail ? (
+                          <Box>
+                            <Button
+                              variant="outlined"
+                              onClick={() => setShowThumbnailUpload(true)}
+                              sx={{ mb: 2 }}
+                            >
+                              Chọn Ảnh Thumbnail
+                            </Button>
+                            
+                            {showThumbnailUpload && (
+                              <Box sx={{ mb: 2 }}>
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                                  Upload ảnh làm thumbnail cho video. Định dạng: JPG, PNG, WebP
+                                </Alert>
+                                <MediaUploadForm
+                                  onUploadComplete={handleThumbnailUploadComplete}
+                                  allowMultiple={false}
+                                />
+                              </Box>
+                            )}
+                          </Box>
+                        ) : (
+                          <Box>
+                            <Typography variant="subtitle2" gutterBottom>
+                              Thumbnail đã upload
+                            </Typography>
+                            <Paper sx={{ p: 2, maxWidth: 300 }}>
+                              <Box
+                                component="img"
+                                src={uploadedThumbnail.secure_url}
+                                alt="Thumbnail"
+                                sx={{
+                                  width: '100%',
+                                  height: 'auto',
+                                  borderRadius: 1
+                                }}
+                              />
+                              <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="caption">
+                                  {uploadedThumbnail.original_filename}
+                                </Typography>
+                                <Button
+                                  color="error"
+                                  size="small"
+                                  onClick={() => {
+                                    setUploadedThumbnail(null);
+                                    setShowThumbnailUpload(false);
+                                  }}
+                                >
+                                  Xóa
+                                </Button>
+                              </Box>
+                            </Paper>
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+
+                    {/* URL Input Option */}
+                    {thumbnailType === 'url' && (
+                      <Box>
+                        <TextField
+                          label="Link ảnh thumbnail"
+                          value={thumbnailUrl}
+                          onChange={(e) => handleThumbnailUrlChange(e.target.value)}
+                          fullWidth
+                          placeholder="https://example.com/thumbnail.jpg"
+                          error={!!thumbnailUrlError}
+                          helperText={thumbnailUrlError || 'Nhập link ảnh thumbnail cho video'}
+                          sx={{ mb: 2 }}
+                        />
+                        
+                        {thumbnailUrl && !thumbnailUrlError && (
+                          <Box>
+                            <Typography variant="subtitle2" gutterBottom>
+                              Preview thumbnail
+                            </Typography>
+                            <Paper sx={{ p: 2, maxWidth: 300 }}>
+                              <Box
+                                component="img"
+                                src={thumbnailUrl}
+                                alt="Thumbnail preview"
+                                sx={{
+                                  width: '100%',
+                                  height: 'auto',
+                                  borderRadius: 1
+                                }}
+                                onError={() => setThumbnailUrlError('Không thể tải ảnh từ link này')}
+                              />
+                            </Paper>
+                          </Box>
+                        )}
+                      </Box>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -272,6 +500,133 @@ export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVide
                             </Button>
                           </Box>
                         </Paper>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Thumbnail Card */}
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>Thumbnail Video</Typography>
+                    
+                    {/* Thumbnail Type Selection */}
+                    <FormControl component="fieldset" sx={{ mb: 2 }}>
+                      <Stack direction="row" spacing={2}>
+                        <Button
+                          variant={thumbnailType === 'upload' ? 'contained' : 'outlined'}
+                          onClick={() => setThumbnailType('upload')}
+                          size="small"
+                        >
+                          Upload Ảnh
+                        </Button>
+                        <Button
+                          variant={thumbnailType === 'url' ? 'contained' : 'outlined'}
+                          onClick={() => setThumbnailType('url')}
+                          size="small"
+                        >
+                          Nhập Link
+                        </Button>
+                      </Stack>
+                    </FormControl>
+
+                    {/* Upload Image Option */}
+                    {thumbnailType === 'upload' && (
+                      <Box>
+                        {!uploadedThumbnail ? (
+                          <Box>
+                            <Button
+                              variant="outlined"
+                              onClick={() => setShowThumbnailUpload(true)}
+                              sx={{ mb: 2 }}
+                            >
+                              Chọn Ảnh Thumbnail
+                            </Button>
+                            
+                            {showThumbnailUpload && (
+                              <Box sx={{ mb: 2 }}>
+                                <Alert severity="info" sx={{ mb: 2 }}>
+                                  Upload ảnh làm thumbnail cho video. Định dạng: JPG, PNG, WebP
+                                </Alert>
+                                <MediaUploadForm
+                                  onUploadComplete={handleThumbnailUploadComplete}
+                                  allowMultiple={false}
+                                  acceptedTypes={{ 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] }}
+                                />
+                              </Box>
+                            )}
+                          </Box>
+                        ) : (
+                          <Box>
+                            <Typography variant="subtitle2" gutterBottom>
+                              Thumbnail đã upload
+                            </Typography>
+                            <Paper sx={{ p: 2, maxWidth: 300 }}>
+                              <Box
+                                component="img"
+                                src={uploadedThumbnail.secure_url}
+                                alt="Thumbnail"
+                                sx={{
+                                  width: '100%',
+                                  height: 'auto',
+                                  borderRadius: 1
+                                }}
+                              />
+                              <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="caption">
+                                  {uploadedThumbnail.original_filename}
+                                </Typography>
+                                <Button
+                                  color="error"
+                                  size="small"
+                                  onClick={() => {
+                                    setUploadedThumbnail(null);
+                                    setShowThumbnailUpload(false);
+                                  }}
+                                >
+                                  Xóa
+                                </Button>
+                              </Box>
+                            </Paper>
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+
+                    {/* URL Input Option */}
+                    {thumbnailType === 'url' && (
+                      <Box>
+                        <TextField
+                          label="Link ảnh thumbnail"
+                          value={thumbnailUrl}
+                          onChange={(e) => handleThumbnailUrlChange(e.target.value)}
+                          fullWidth
+                          placeholder="https://example.com/thumbnail.jpg"
+                          error={!!thumbnailUrlError}
+                          helperText={thumbnailUrlError || 'Nhập link ảnh thumbnail cho video'}
+                          sx={{ mb: 2 }}
+                        />
+                        
+                        {thumbnailUrl && !thumbnailUrlError && (
+                          <Box>
+                            <Typography variant="subtitle2" gutterBottom>
+                              Preview thumbnail
+                            </Typography>
+                            <Paper sx={{ p: 2, maxWidth: 300 }}>
+                              <Box
+                                component="img"
+                                src={thumbnailUrl}
+                                alt="Thumbnail preview"
+                                sx={{
+                                  width: '100%',
+                                  height: 'auto',
+                                  borderRadius: 1
+                                }}
+                                onError={() => setThumbnailUrlError('Không thể tải ảnh từ link này')}
+                              />
+                            </Paper>
+                          </Box>
+                        )}
                       </Box>
                     )}
                   </CardContent>
