@@ -94,20 +94,56 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
       setSaving(true);
       const now = Date.now();
       
-      const newHealthTip = {
+      // Clean content blocks and remove ALL undefined values completely
+      const cleanedContent = content
+        .filter(block => block.content && block.content.trim())
+        .map(block => {
+          const cleanBlock: any = {
+            id: block.id,
+            type: block.type,
+            content: block.content.trim()
+          };
+          
+          // Only add metadata if it exists and has valid values
+          if (block.metadata) {
+            const validMetadata: any = {};
+            
+            for (const [key, value] of Object.entries(block.metadata)) {
+              if (value !== undefined && value !== null && value !== '') {
+                validMetadata[key] = value;
+              }
+            }
+            
+            // Only add metadata if it has valid entries
+            if (Object.keys(validMetadata).length > 0) {
+              cleanBlock.metadata = validMetadata;
+            }
+          }
+          
+          return cleanBlock;
+        });
+
+      // Debug: Log the cleaned content to check for undefined values
+      console.log('Cleaned Content:', JSON.stringify(cleanedContent, null, 2));
+      
+      const newHealthTip: any = {
         title: title.trim(),
-        content: content.filter(block => block.content.trim()), // Only save non-empty blocks
+        content: cleanedContent,
         categoryId: category,
         tags,
         status,
         author: currentUser?.displayName || 'Admin',
         createdAt: now,
         updatedAt: now,
-        publishedAt: status === 'published' ? now : undefined,
         viewCount: 0,
         likeCount: 0,
         isFeature,
       };
+
+      // Only add publishedAt if status is published
+      if (status === 'published') {
+        newHealthTip.publishedAt = now;
+      }
 
       await healthTipsService.create(newHealthTip as Omit<HealthTip, 'id'>);
       
@@ -128,6 +164,17 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
     }
   };
 
+  const handleRemoveUploadedMedia = (mediaId: string) => {
+    setUploadedMedia(prev => prev.filter(media => media.id !== mediaId));
+    
+    // Also remove from content if it was inserted
+    setContent(prev => prev.filter(block => 
+      !(block.type === 'image' && block.content.includes(mediaId))
+    ));
+    
+    toast.success('Đã xóa media');
+  };
+
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
@@ -145,7 +192,7 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
         content: m.secure_url,
         metadata: {
           alt: m.original_filename || 'Uploaded image',
-          caption: m.original_filename || ''
+          caption: ''
         }
       }));
     
@@ -268,7 +315,6 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
                       <Box sx={{ mb: 2 }}>
                         <MediaUploadForm
                           onUploadComplete={handleMediaUploadComplete}
-                          maxFiles={10}
                           allowMultiple={true}
                         />
                       </Box>
@@ -291,6 +337,14 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
                               <Typography variant="caption" sx={{ flex: 1, fontSize: '0.75rem' }}>
                                 {media.original_filename}
                               </Typography>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleRemoveUploadedMedia(media.id)}
+                                sx={{ ml: 'auto' }}
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
                             </Paper>
                           ))}
                         </Stack>

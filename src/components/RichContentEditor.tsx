@@ -67,8 +67,12 @@ export default function RichContentEditor({
       id: generateId(),
       type,
       content: '',
-      metadata: type === 'heading' ? { level: 2 } : undefined,
     };
+
+    // Only add metadata for heading blocks
+    if (type === 'heading') {
+      newBlock.metadata = { level: 2 };
+    }
 
     const newContent = [...content];
     if (index !== undefined) {
@@ -80,9 +84,31 @@ export default function RichContentEditor({
   };
 
   const updateBlock = (id: string, updates: Partial<ContentBlock>) => {
-    const newContent = content.map(block =>
-      block.id === id ? { ...block, ...updates } : block
-    );
+    const newContent = content.map(block => {
+      if (block.id === id) {
+        const updatedBlock = { ...block, ...updates };
+        
+        // Clean metadata - remove empty values
+        if (updatedBlock.metadata) {
+          const cleanMetadata: any = {};
+          
+          for (const [key, value] of Object.entries(updatedBlock.metadata)) {
+            if (value !== undefined && value !== null && value !== '') {
+              cleanMetadata[key] = value;
+            }
+          }
+          
+          if (Object.keys(cleanMetadata).length > 0) {
+            updatedBlock.metadata = cleanMetadata;
+          } else {
+            delete updatedBlock.metadata;
+          }
+        }
+        
+        return updatedBlock;
+      }
+      return block;
+    });
     onContentChange(newContent);
   };
 
@@ -261,7 +287,10 @@ export default function RichContentEditor({
                     <Select
                       value={block.metadata?.level || 2}
                       onChange={(e) => updateBlock(block.id, {
-                        metadata: { ...block.metadata, level: e.target.value as 1 | 2 | 3 | 4 | 5 | 6 }
+                        metadata: { 
+                          ...(block.metadata || {}), 
+                          level: e.target.value as 1 | 2 | 3 | 4 | 5 | 6 
+                        }
                       })}
                       label="Cấp độ"
                     >
@@ -337,7 +366,10 @@ export default function RichContentEditor({
                     label="Alt text"
                     value={block.metadata?.alt || ''}
                     onChange={(e) => updateBlock(block.id, {
-                      metadata: { ...block.metadata, alt: e.target.value }
+                      metadata: { 
+                        ...(block.metadata || {}), 
+                        alt: e.target.value
+                      }
                     })}
                   />
                 </Grid>
@@ -348,7 +380,10 @@ export default function RichContentEditor({
                     label="Chú thích"
                     value={block.metadata?.caption || ''}
                     onChange={(e) => updateBlock(block.id, {
-                      metadata: { ...block.metadata, caption: e.target.value }
+                      metadata: { 
+                        ...(block.metadata || {}), 
+                        caption: e.target.value
+                      }
                     })}
                   />
                 </Grid>
