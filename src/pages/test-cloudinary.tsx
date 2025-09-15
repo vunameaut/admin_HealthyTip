@@ -9,7 +9,6 @@ import {
   LinearProgress,
 } from '@mui/material';
 import { CloudUpload } from '@mui/icons-material';
-import { uploadVideoToCloudinary } from '@/utils/cloudinary';
 
 export default function CloudinaryTestPage() {
   const [uploading, setUploading] = useState(false);
@@ -31,15 +30,17 @@ export default function CloudinaryTestPage() {
       setError('');
       setProgress(0);
 
-      const uploadResult = await uploadVideoToCloudinary(file, {
-        folder: 'health_videos_test',
-        uploadPreset: 'ml_default', // Use default preset for testing
-        onProgress: (progress) => {
-          setProgress(progress);
-        }
-      });
+      // NOTE: uploadVideoToCloudinary function is not available
+      // const uploadResult = await uploadVideoToCloudinary(file, {
+      //   folder: 'health_videos_test',
+      //   uploadPreset: 'ml_default', // Use default preset for testing
+      //   onProgress: (progress: number) => {
+      //     setProgress(progress);
+      //   }
+      // });
 
-      setResult(uploadResult);
+      // setResult(uploadResult);
+      setError('Function uploadVideoToCloudinary is not implemented');
     } catch (error) {
       console.error('Upload error:', error);
       setError('Lỗi upload: ' + (error as Error).message);

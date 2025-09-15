@@ -75,17 +75,24 @@ import AuthGuard from '../../components/AuthGuard';
 import VideoPlayer from '../../components/VideoPlayer';
 import { videosService, categoriesService } from '../../services/firebase';
 import { ShortVideo, Category, FilterOptions } from '../../types';
-import { getCloudinaryVideoThumbnail, getCloudinaryVideoUrl, uploadVideoToCloudinary } from '../../utils/cloudinary';
+import { getCloudinaryVideoThumbnail, getCloudinaryVideoUrl } from '../../utils/cloudinary';
 import toast from 'react-hot-toast';
 
 // =================================================================
 // Comment Section Component
 // =================================================================
-const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }) => {
-  const [showComments, setShowComments] = useState(true);
-  const [expandedReplies, setExpandedReplies] = useState({});
+interface CommentSectionProps {
+  video: any;
+  onDeleteComment: (commentId: string) => void;
+  onBanUser: (userId: string) => void;
+  formatDate: (timestamp: number) => string;
+}
 
-  const toggleReplies = (commentId) => {
+const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }: CommentSectionProps) => {
+  const [showComments, setShowComments] = useState(true);
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+
+  const toggleReplies = (commentId: string) => {
     setExpandedReplies(prev => ({ ...prev, [commentId]: !prev[commentId] }));
   };
 
@@ -115,7 +122,7 @@ const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }) => {
       }
     }
     
-    const sortByDate = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
+    const sortByDate = (a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0);
     rootComments.sort(sortByDate);
     for (const root of rootComments) {
       if (root.replies) {
@@ -126,7 +133,7 @@ const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }) => {
     return rootComments;
   }, [video?.comments]);
 
-  const renderComment = (comment, isReply = false) => {
+  const renderComment = (comment: any, isReply = false) => {
     if (!comment) return null;
 
     const commentBody = (
@@ -222,7 +229,7 @@ const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }) => {
                       </Button>
                       <Collapse in={expandedReplies[rootComment.id]}>
                         <List sx={{ pt: 0 }}>
-                          {rootComment.replies.map(reply => renderComment(reply, true))}
+                          {rootComment.replies.map((reply: any) => renderComment(reply, true))}
                         </List>
                       </Collapse>
                     </Box>
@@ -363,60 +370,63 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
       setUploading(true);
       setUploadProgress(0);
       
-      for (let i = 0; i < filesToUpload.length; i++) {
-        const file = filesToUpload[i];
-        
-        try {
-          // Upload to Cloudinary
-          const uploadResult = await uploadVideoToCloudinary(file, {
-            folder: 'health_videos',
-            onProgress: (progress) => {
-              setUploadProgress((i / filesToUpload.length * 100) + (progress / filesToUpload.length));
-            }
-          });
-          
-          // Create video record in Firebase
-          // Generate thumbnail URL
-          const thumbnailUrl = getCloudinaryVideoThumbnail(uploadResult.public_id);
-          
-          const newVideo: Omit<ShortVideo, 'id'> = {
-            title: newVideoData.title || file.name.replace(/\.[^/.]+$/, ""),
-            caption: newVideoData.caption,
-            videoUrl: uploadResult.secure_url,
-            thumbnailUrl: thumbnailUrl,
-            thumb: thumbnailUrl, // Save thumb URL to match data structure
-            cldPublicId: uploadResult.public_id, // Use cldPublicId for consistency
-            cldVersion: Date.now(), // Add version for Cloudinary URL generation
-            categoryId: newVideoData.categoryId,
-            viewCount: 0,
-            likeCount: 0,
-            userId: 'admin', // Would be current user
-            status: newVideoData.status as 'draft' | 'published',
-            uploadDate: Date.now(),
-            updatedAt: Date.now(),
-            duration: uploadResult.duration || 0,
-            width: uploadResult.width || 0,
-            height: uploadResult.height || 0,
-            tags: newVideoData.tags.split(',').reduce((acc: Record<string, boolean>, tag) => {
-              const trimmedTag = tag.trim();
-              if (trimmedTag) {
-                acc[trimmedTag] = true;
-              }
-              return acc;
-            }, {}),
-          };
-          
-          await videosService.create(newVideo);
-          
-        } catch (uploadError) {
-          console.error(`Error uploading ${file.name}:`, uploadError);
-          toast.error(`Lỗi tải lên ${file.name}`);
-        }
-      }
+      // NOTE: Upload functionality disabled - uploadVideoToCloudinary not available
+      toast.error('Chức năng upload video hiện chưa khả dụng');
       
-      toast.success(`Đã tải lên ${filesToUpload.length} video thành công`);
+      // for (let i = 0; i < filesToUpload.length; i++) {
+      //   const file = filesToUpload[i];
+      //   
+      //   try {
+      //     // Upload to Cloudinary
+      //     const uploadResult = await uploadVideoToCloudinary(file, {
+      //       folder: 'health_videos',
+      //       onProgress: (progress: number) => {
+      //         const totalProgress = ((i * 100 + progress) / filesToUpload.length);
+      //         setUploadProgress(totalProgress);
+      //       }
+      //     });
+      //     
+      //     // Create video record in Firebase
+      //     const thumbnailUrl = getCloudinaryVideoThumbnail(uploadResult.public_id);
+      //     
+      //     const newVideo: Omit<ShortVideo, 'id'> = {
+      //       title: newVideoData.title || file.name.replace(/\.[^/.]+$/, ""),
+      //       caption: newVideoData.caption,
+      //       videoUrl: uploadResult.secure_url,
+      //       thumbnailUrl: thumbnailUrl,
+      //       thumb: thumbnailUrl,
+      //       cldPublicId: uploadResult.public_id,
+      //       cldVersion: Date.now(),
+      //       categoryId: newVideoData.categoryId,
+      //       viewCount: 0,
+      //       likeCount: 0,
+      //       userId: 'admin',
+      //       status: newVideoData.status as 'draft' | 'published',
+      //       uploadDate: Date.now(),
+      //       updatedAt: Date.now(),
+      //       duration: uploadResult.duration || 0,
+      //       width: uploadResult.width || 0,
+      //       height: uploadResult.height || 0,
+      //       tags: newVideoData.tags.split(',').reduce((acc: Record<string, boolean>, tag) => {
+      //         const trimmedTag = tag.trim();
+      //         if (trimmedTag) {
+      //           acc[trimmedTag] = true;
+      //         }
+      //         return acc;
+      //       }, {}),
+      //     };
+      //     
+      //     await videosService.create(newVideo);
+      //     
+      //   } catch (uploadError) {
+      //     console.error(`Error uploading ${file.name}:`, uploadError);
+      //     toast.error(`Lỗi tải lên ${file.name}`);
+      //   }
+      // }
+      
+      // toast.success(`Đã tải lên ${filesToUpload.length} video thành công`);
       handleCloseUploadDialog();
-      loadData();
+      // loadData();
     } catch (error) {
       console.error('Error uploading videos:', error);
       toast.error('Có lỗi xảy ra khi tải lên video');
@@ -1234,16 +1244,23 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
                       <VideoPlayer
-                        videoUrl={selectedVideo.videoUrl}
-                        cloudinaryPublicId={selectedVideo.cloudinaryPublicId}
-                        cldPublicId={selectedVideo.cldPublicId}
-                        thumbnailUrl={selectedVideo.thumbnailUrl}
-                        thumb={selectedVideo.thumb}
-                        title={selectedVideo.title}
+                        media={{
+                          id: selectedVideo.id,
+                          secure_url: selectedVideo.videoUrl || '',
+                          public_id: selectedVideo.cldPublicId || selectedVideo.cloudinaryPublicId || '',
+                          version: selectedVideo.cldVersion?.toString() || '1',
+                          thumbnail_url: selectedVideo.thumbnailUrl || selectedVideo.thumb || '',
+                          categoryId: selectedVideo.categoryId,
+                          uploadDate: selectedVideo.uploadDate || selectedVideo.createdAt || Date.now(),
+                          uploader: selectedVideo.userId || 'admin',
+                          type: 'video',
+                          duration: selectedVideo.duration || 0,
+                          width: selectedVideo.width || 0,
+                          height: selectedVideo.height || 0
+                        }}
                         width="100%"
                         height={200}
                         controls={true}
-                        muted={false}
                       />
                     </Grid>
                     <Grid item xs={12} md={6}>

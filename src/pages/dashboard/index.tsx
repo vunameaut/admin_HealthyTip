@@ -439,7 +439,7 @@ export default function DashboardPage({ darkMode, toggleDarkMode }: DashboardPag
                             </TableCell>
                             <TableCell>
                               <Typography variant="caption">
-                                {formatDate(video.uploadDate || video.createdAt)}
+                                {formatDate(video.uploadDate || video.createdAt || Date.now())}
                               </Typography>
                             </TableCell>
                           </TableRow>

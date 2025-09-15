@@ -51,7 +51,14 @@ import toast from 'react-hot-toast';
 // =================================================================
 // Comment Section Component
 // =================================================================
-const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }) => {
+interface CommentSectionProps {
+  video: any;
+  onDeleteComment: (commentId: string) => void;
+  onBanUser: (userId: string) => void;
+  formatDate: (timestamp: number) => string;
+}
+
+const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }: CommentSectionProps) => {
   const [showComments, setShowComments] = useState(true);
 
   const processedComments = useMemo(() => {
@@ -79,7 +86,7 @@ const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }) => {
       }
     }
     
-    const sortByDate = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
+    const sortByDate = (a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0);
     rootComments.sort(sortByDate);
     for (const root of rootComments) {
       if (root.replies) {
@@ -90,7 +97,7 @@ const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }) => {
     return rootComments;
   }, [video?.comments]);
 
-  const renderComment = (comment, isReply = false) => {
+  const renderComment = (comment: any, isReply = false) => {
     if (!comment) return null;
     return (
       <ListItem 
@@ -174,7 +181,7 @@ const CommentSection = ({ video, onDeleteComment, onBanUser, formatDate }) => {
                       borderColor: 'divider',
                     }}>
                       <List sx={{py: 0}}>
-                        {rootComment.replies.map(reply => renderComment(reply, true))}
+                        {rootComment.replies.map((reply: any) => renderComment(reply, true))}
                       </List>
                     </Box>
                   )}
@@ -463,15 +470,23 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
                   {(video.videoUrl || video.cldPublicId || video.cloudinaryPublicId) && (
                     <Box mb={2}>
                       <VideoPlayer
-                        cloudinaryPublicId={video.cldPublicId || video.cloudinaryPublicId}
-                        videoUrl={video.videoUrl}
-                        thumbnailUrl={video.thumbnailUrl || video.thumb}
-                        title={video.title}
+                        media={{
+                          id: video.id,
+                          secure_url: video.videoUrl || '',
+                          public_id: video.cldPublicId || video.cloudinaryPublicId || '',
+                          version: video.cldVersion?.toString() || '1',
+                          thumbnail_url: video.thumbnailUrl || video.thumb || '',
+                          categoryId: video.categoryId,
+                          uploadDate: video.uploadDate || video.createdAt || Date.now(),
+                          uploader: video.userId || 'admin',
+                          type: 'video',
+                          duration: video.duration || 0,
+                          width: video.width || 0,
+                          height: video.height || 0
+                        }}
                         controls={true}
-                        muted={false}
                         width="100%"
                         height={250}
-                        onVideoInfoLoaded={handleVideoInfoLoaded}
                       />
                     </Box>
                   )}

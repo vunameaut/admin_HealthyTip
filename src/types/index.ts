@@ -28,7 +28,7 @@ export interface ContentBlock {
 export interface HealthTip {
   id: string;
   title: string;
-  content: ContentBlock[]; // Support both formats for backward compatibility
+  content: ContentBlock[] | Array<{ type: 'text' | 'image'; value: string; }>; // Support both formats for backward compatibility
   categoryId: string;
   categoryName?: string;
   viewCount: number;
