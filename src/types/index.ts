@@ -17,7 +17,7 @@ export interface User {
 export interface ContentBlock {
   id: string;
   type: 'text' | 'image' | 'heading' | 'quote';
-  content: string;
+  value: string;
   metadata?: {
     level?: 1 | 2 | 3 | 4 | 5 | 6; // For headings
     alt?: string; // For images
@@ -28,7 +28,7 @@ export interface ContentBlock {
 export interface HealthTip {
   id: string;
   title: string;
-  content: ContentBlock[] | Array<{ type: 'text' | 'image'; value: string; }>; // Support both formats for backward compatibility
+  content: ContentBlock[]; // Support both formats for backward compatibility
   categoryId: string;
   categoryName?: string;
   viewCount: number;

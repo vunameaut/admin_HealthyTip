@@ -86,20 +86,15 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
         setHealthTip(data);
         setTitle(data.title || '');
         setExcerpt(data.excerpt || '');
-        // Handle both old string content and new block content
         if (typeof data.content === 'string') {
           setBlocks([{ type: 'text', value: data.content }]);
         } else if (Array.isArray(data.content)) {
-          // Convert ContentBlock[] to { type, value }[] format
+          // New format is ContentBlock[], but old data might have 'content' property instead of 'value'
           const convertedBlocks = data.content.map((block: any) => {
-            if ('content' in block) {
-              // ContentBlock format
-              return { type: block.type === 'text' ? 'text' : 'image', value: block.content };
-            } else {
-              // Already in { type, value } format
-              return block;
-            }
-          });
+            const value = block.value || block.content || '';
+            const type = block.type === 'image' ? 'image' : 'text'; // Default to text
+            return { type, value };
+          }).filter(block => block.type === 'text' || block.type === 'image'); // Ensure only supported types
           setBlocks(convertedBlocks);
         }
         setCategory(data.categoryId || '');
