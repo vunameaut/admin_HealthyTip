@@ -109,31 +109,30 @@ export default function RichContentEditor({
 
   const uploadImageToCloudinary = async (file: File): Promise<string> => {
     try {
-      // Get upload signature from our API
-      const signatureResponse = await fetch('/api/cloudinary/image-signature', {
+      // Get upload config (unsigned approach)
+      const configResponse = await fetch('/api/cloudinary/signature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          folder: 'health_content',
+          category: 'editor-images', // Default category for RichEditor images
+          resourceType: 'image'
         }),
       });
 
-      if (!signatureResponse.ok) {
-        throw new Error('Failed to get upload signature');
+      if (!configResponse.ok) {
+        throw new Error('Failed to get upload config');
       }
 
-      const { signature, timestamp, api_key, cloud_name, folder } = await signatureResponse.json();
+      const { upload_preset, cloud_name, folder, upload_url } = await configResponse.json();
 
-      // Prepare form data
+      // Prepare form data for unsigned upload
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('signature', signature);
-      formData.append('timestamp', timestamp.toString());
-      formData.append('api_key', api_key);
+      formData.append('upload_preset', upload_preset);
       formData.append('folder', folder);
       
-      // Upload to Cloudinary
-      const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`, {
+      // Upload to Cloudinary using unsigned upload
+      const uploadResponse = await fetch(upload_url, {
         method: 'POST',
         body: formData,
       });

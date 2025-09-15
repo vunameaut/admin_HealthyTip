@@ -15,51 +15,46 @@ import {
   Chip,
   Stack,
   Paper,
-  IconButton,
   Divider,
   FormControlLabel,
-  Switch
+  Switch,
+  Alert
 } from '@mui/material';
 import {
   Save,
   Cancel,
+  VideoLibrary,
   Add,
-  Delete,
-  ArrowUpward,
-  ArrowDownward,
-  TextFields,
-  Image
+  PlayArrow
 } from '@mui/icons-material';
 import LayoutWrapper from '../../components/LayoutWrapper';
 import AuthGuard, { useCurrentUser } from '../../components/AuthGuard';
-import RichContentEditor, { ContentBlock } from '../../components/RichContentEditor';
 import MediaUploadForm from '../../components/MediaUploadForm';
-import { healthTipsService, categoriesService } from '../../services/firebase';
-import { HealthTip, Media } from '../../types';
+import VideoPlayer from '../../components/VideoPlayer';
+import { categoriesService } from '../../services/firebase';
+import { Media } from '../../types';
 import toast from 'react-hot-toast';
 
-interface CreateHealthTipPageProps {
+interface CreateVideoPageProps {
   darkMode?: boolean;
   toggleDarkMode?: () => void;
 }
 
-export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: CreateHealthTipPageProps) {
+export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVideoPageProps) {
   const router = useRouter();
   const { currentUser } = useCurrentUser();
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState<ContentBlock[]>([
-    { id: 'initial', type: 'text', content: '' }
-  ]);
+  const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [isFeature, setIsFeature] = useState(false);
-  const [uploadedMedia, setUploadedMedia] = useState<Media[]>([]);
-  const [showMediaUpload, setShowMediaUpload] = useState(false);
+  const [uploadedVideo, setUploadedVideo] = useState<Media | null>(null);
+  const [showVideoUpload, setShowVideoUpload] = useState(true);
 
   useEffect(() => {
     loadCategories();
@@ -76,7 +71,7 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
 
   const handleSave = async () => {
     if (!title.trim()) {
-      toast.error('Vui lòng nhập tiêu đề');
+      toast.error('Vui lòng nhập tiêu đề video');
       return;
     }
 
@@ -85,8 +80,8 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
       return;
     }
 
-    if (content.length === 0 || content.every(block => !block.content.trim())) {
-      toast.error('Vui lòng thêm nội dung cho bài viết');
+    if (!uploadedVideo) {
+      toast.error('Vui lòng upload video');
       return;
     }
 
@@ -94,9 +89,10 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
       setSaving(true);
       const now = Date.now();
       
-      const newHealthTip = {
+      // Tạo short video record trong database
+      const newVideo = {
         title: title.trim(),
-        content: content.filter(block => block.content.trim()), // Only save non-empty blocks
+        description: description.trim(),
         categoryId: category,
         tags,
         status,
@@ -107,17 +103,35 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
         viewCount: 0,
         likeCount: 0,
         isFeature,
+        videoUrl: uploadedVideo.secure_url,
+        thumbnailUrl: uploadedVideo.thumbnail_url,
+        duration: uploadedVideo.duration || 0,
+        mediaId: uploadedVideo.id,
+        uploader: currentUser?.uid || 'unknown'
       };
 
-      await healthTipsService.create(newHealthTip as Omit<HealthTip, 'id'>);
+      // TODO: Create videoService similar to healthTipsService
+      // await videoService.create(newVideo);
       
-      toast.success('Tạo bài viết thành công!');
-      router.push('/content');
+      console.log('Video data to save:', newVideo);
+      toast.success('Video đã được tạo thành công! (Chưa lưu database - cần tạo videoService)');
+      
+      // router.push('/videos');
     } catch (error) {
-      console.error('Error creating health tip:', error);
-      toast.error('Có lỗi khi tạo bài viết');
+      console.error('Error creating video:', error);
+      toast.error('Có lỗi khi tạo video');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (uploadedVideo || title || description) {
+      if (window.confirm('Bạn có chắc muốn hủy? Dữ liệu chưa lưu sẽ bị mất.')) {
+        router.push('/videos');
+      }
+    } else {
+      router.push('/videos');
     }
   };
 
@@ -132,43 +146,26 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const handleMediaUploadComplete = (media: Media[]) => {
-    setUploadedMedia(prev => [...prev, ...media]);
-    toast.success(`Đã upload ${media.length} file thành công!`);
-    
-    // Auto insert images into content
-    const imageBlocks: ContentBlock[] = media
-      .filter(m => m.type === 'image')
-      .map(m => ({
-        id: `media_${m.id}_${Date.now()}`,
-        type: 'image' as const,
-        content: m.secure_url,
-        metadata: {
-          alt: m.original_filename || 'Uploaded image',
-          caption: m.original_filename || ''
-        }
-      }));
-    
-    if (imageBlocks.length > 0) {
-      setContent(prev => [...prev, ...imageBlocks]);
+  const handleVideoUploadComplete = (media: Media[]) => {
+    const videoFile = media.find(m => m.type === 'video');
+    if (videoFile) {
+      setUploadedVideo(videoFile);
+      setShowVideoUpload(false);
+      toast.success('Video upload thành công!');
     }
   };
 
   return (
     <AuthGuard>
       <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
-        <Box sx={{ flexGrow: 1, p: 3 }}>
-          {/* Header */}
+        <Box p={3}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              Tạo bài viết mới
-            </Typography>
+            <Typography variant="h4">Tạo Video Mới</Typography>
             <Stack direction="row" spacing={2}>
-              <Button
-                variant="outlined"
+              <Button 
+                variant="outlined" 
                 startIcon={<Cancel />}
-                onClick={() => router.push('/content')}
-                disabled={saving}
+                onClick={handleCancel}
               >
                 Hủy
               </Button>
@@ -178,25 +175,108 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
                 onClick={handleSave}
                 disabled={saving}
               >
-                {saving ? 'Đang lưu...' : 'Lưu bài viết'}
+                {saving ? 'Đang lưu...' : 'Lưu Video'}
               </Button>
             </Stack>
           </Box>
 
-          {/* Edit Form */}
           <Grid container spacing={3}>
-            {/* Main Content */}
+            {/* Main content */}
             <Grid item xs={12} md={8}>
-              <Card>
-                <CardContent>
-                  <RichContentEditor
-                    title={title}
-                    content={content}
-                    onTitleChange={setTitle}
-                    onContentChange={setContent}
-                  />
-                </CardContent>
-              </Card>
+              <Stack spacing={3}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>Thông tin cơ bản</Typography>
+                    <Stack spacing={2}>
+                      <TextField
+                        label="Tiêu đề video"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        fullWidth
+                        required
+                        placeholder="Nhập tiêu đề cho video..."
+                      />
+                      <TextField
+                        label="Mô tả"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        fullWidth
+                        multiline
+                        rows={4}
+                        placeholder="Mô tả ngắn về nội dung video..."
+                      />
+                    </Stack>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6">Video Upload</Typography>
+                      {uploadedVideo && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => setShowVideoUpload(!showVideoUpload)}
+                          startIcon={<VideoLibrary />}
+                        >
+                          {showVideoUpload ? 'Ẩn Upload' : 'Thay đổi Video'}
+                        </Button>
+                      )}
+                    </Box>
+                    
+                    {showVideoUpload && (
+                      <Box sx={{ mb: 2 }}>
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                          Chỉ upload 1 video duy nhất. Định dạng hỗ trợ: MP4, MOV, AVI, MKV, WebM. Kích thước tối đa: 100MB
+                        </Alert>
+                        <MediaUploadForm
+                          onUploadComplete={handleVideoUploadComplete}
+                          allowMultiple={false}
+                          acceptedTypes={{ 'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm'] }}
+                        />
+                      </Box>
+                    )}
+                    
+                    {uploadedVideo && (
+                      <Box>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Video đã upload
+                        </Typography>
+                        <Paper sx={{ p: 2 }}>
+                          <VideoPlayer
+                            media={uploadedVideo}
+                            controls={true}
+                          />
+                          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box>
+                              <Typography variant="body2">
+                                <strong>File:</strong> {uploadedVideo.original_filename}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                <strong>Kích thước:</strong> {(uploadedVideo.bytes! / (1024 * 1024)).toFixed(2)} MB
+                                {uploadedVideo.duration && (
+                                  <> • <strong>Thời lượng:</strong> {Math.round(uploadedVideo.duration)}s</>
+                                )}
+                              </Typography>
+                            </Box>
+                            <Button
+                              color="error"
+                              size="small"
+                              onClick={() => {
+                                setUploadedVideo(null);
+                                setShowVideoUpload(true);
+                              }}
+                            >
+                              Xóa
+                            </Button>
+                          </Box>
+                        </Paper>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </Stack>
             </Grid>
 
             {/* Sidebar */}
@@ -224,7 +304,7 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
                           onChange={(e) => setIsFeature(e.target.checked)}
                         />
                       }
-                      label="Bài viết nổi bật"
+                      label="Video nổi bật"
                     />
                   </CardContent>
                 </Card>
@@ -238,6 +318,7 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
                         label="Danh mục"
+                        required
                       >
                         <MenuItem value="">Chọn danh mục</MenuItem>
                         {categories.map((cat) => (
@@ -247,55 +328,6 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
                         ))}
                       </Select>
                     </FormControl>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="h6">Media</Typography>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => setShowMediaUpload(!showMediaUpload)}
-                        startIcon={<Image />}
-                      >
-                        {showMediaUpload ? 'Ẩn Upload' : 'Upload Media'}
-                      </Button>
-                    </Box>
-                    
-                    {showMediaUpload && (
-                      <Box sx={{ mb: 2 }}>
-                        <MediaUploadForm
-                          onUploadComplete={handleMediaUploadComplete}
-                          maxFiles={10}
-                          allowMultiple={true}
-                        />
-                      </Box>
-                    )}
-                    
-                    {uploadedMedia.length > 0 && (
-                      <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Media đã upload ({uploadedMedia.length})
-                        </Typography>
-                        <Stack spacing={1}>
-                          {uploadedMedia.slice(-5).map((media) => (
-                            <Paper key={media.id} sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box 
-                                component="img" 
-                                src={media.thumbnail_url} 
-                                alt={media.original_filename}
-                                sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 1 }}
-                              />
-                              <Typography variant="caption" sx={{ flex: 1, fontSize: '0.75rem' }}>
-                                {media.original_filename}
-                              </Typography>
-                            </Paper>
-                          ))}
-                        </Stack>
-                      </Box>
-                    )}
                   </CardContent>
                 </Card>
 

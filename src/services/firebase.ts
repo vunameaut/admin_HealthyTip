@@ -1,6 +1,6 @@
 import { ref, push, set, get, update, remove, query, orderByChild, orderByKey, limitToLast, limitToFirst, startAt, endAt, onValue, off } from 'firebase/database';
 import { database } from '../lib/firebase';
-import { HealthTip, Category, FirebaseAnalytics, User, ShortVideo, Reminder, FilterOptions, ApiResponse } from '../types';
+import { HealthTip, Category, FirebaseAnalytics, User, ShortVideo, Reminder, FilterOptions, ApiResponse, Media } from '../types';
 
 // Health Tips Service
 export class HealthTipsService {
@@ -507,3 +507,107 @@ export const videosService = new VideosService();
 export const usersService = new UsersService();
 export const analyticsService = new AnalyticsService();
 export const remindersService = new RemindersService();
+
+// Media Service
+export class MediaService {
+  private basePath = 'media';
+
+  async getAll(filters?: { categoryId?: string; type?: 'image' | 'video'; uploader?: string }): Promise<Media[]> {
+    try {
+      const mediaRef = ref(database, this.basePath);
+      const snapshot = await get(mediaRef);
+      
+      if (!snapshot.exists()) return [];
+      
+      const media: Media[] = [];
+      snapshot.forEach((child) => {
+        const mediaItem = child.val();
+        media.push({
+          id: child.key!,
+          ...mediaItem
+        });
+      });
+
+      // Apply filters
+      let filteredMedia = media;
+      if (filters?.categoryId) {
+        filteredMedia = filteredMedia.filter(m => m.categoryId === filters.categoryId);
+      }
+      if (filters?.type) {
+        filteredMedia = filteredMedia.filter(m => m.type === filters.type);
+      }
+      if (filters?.uploader) {
+        filteredMedia = filteredMedia.filter(m => m.uploader === filters.uploader);
+      }
+
+      return filteredMedia.sort((a, b) => b.uploadDate - a.uploadDate);
+    } catch (error) {
+      console.error('Error fetching media:', error);
+      throw error;
+    }
+  }
+
+  async getById(id: string): Promise<Media | null> {
+    try {
+      const mediaRef = ref(database, `${this.basePath}/${id}`);
+      const snapshot = await get(mediaRef);
+      
+      if (!snapshot.exists()) return null;
+      
+      return {
+        id,
+        ...snapshot.val()
+      };
+    } catch (error) {
+      console.error('Error fetching media item:', error);
+      throw error;
+    }
+  }
+
+  async create(media: Omit<Media, 'id'>): Promise<string> {
+    try {
+      const mediaRef = ref(database, this.basePath);
+      const newMediaRef = push(mediaRef);
+      await set(newMediaRef, {
+        ...media,
+        uploadDate: media.uploadDate || Date.now(),
+        status: media.status || 'ready'
+      });
+      return newMediaRef.key!;
+    } catch (error) {
+      console.error('Error creating media:', error);
+      throw error;
+    }
+  }
+
+  async update(id: string, updates: Partial<Media>): Promise<void> {
+    try {
+      const mediaRef = ref(database, `${this.basePath}/${id}`);
+      await update(mediaRef, updates);
+    } catch (error) {
+      console.error('Error updating media:', error);
+      throw error;
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    try {
+      const mediaRef = ref(database, `${this.basePath}/${id}`);
+      await remove(mediaRef);
+    } catch (error) {
+      console.error('Error deleting media:', error);
+      throw error;
+    }
+  }
+
+  async getByCategory(categoryId: string): Promise<Media[]> {
+    try {
+      return this.getAll({ categoryId });
+    } catch (error) {
+      console.error('Error fetching media by category:', error);
+      throw error;
+    }
+  }
+}
+
+export const mediaService = new MediaService();

@@ -258,6 +258,28 @@ export interface CloudinaryAsset {
   tags?: string[];
 }
 
+export interface Media {
+  id: string;
+  secure_url: string;
+  public_id: string;
+  version: string;
+  thumbnail_url: string;
+  categoryId: string;
+  uploadDate: number;
+  uploader: string;
+  type: 'image' | 'video';
+  duration?: number;
+  width?: number;
+  height?: number;
+  original_filename?: string;
+  bytes?: number;
+  format?: string;
+  resource_type?: string;
+  tags?: string[];
+  folder?: string;
+  status?: 'processing' | 'ready' | 'error';
+}
+
 export interface MediaUpload {
   file: File;
   type: 'image' | 'video';
