@@ -13,8 +13,17 @@ import {
   Collections,
 } from '@mui/icons-material';
 
+interface Collection {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  items?: any[];
+  featured?: boolean;
+}
+
 export default function CollectionsPage() {
-  const [collections, setCollections] = useState([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
 
   const handleExport = () => {
     const dataToExport = collections.map(collection => ({
@@ -37,7 +46,7 @@ export default function CollectionsPage() {
     linkElement.click();
   };
 
-  const handleImport = (event) => {
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -45,7 +54,12 @@ export default function CollectionsPage() {
     reader.onload = (e) => {
       try {
         const content = e.target?.result;
-        const importedCollections = JSON.parse(content);
+        if (typeof content !== 'string') {
+          alert('Không thể đọc file!');
+          return;
+        }
+
+        const importedCollections: Collection[] = JSON.parse(content);
         
         if (!Array.isArray(importedCollections)) {
           alert('File không đúng định dạng!');
