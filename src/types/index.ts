@@ -20,15 +20,19 @@ export interface ContentBlock {
   value: string;
   metadata?: {
     level?: 1 | 2 | 3 | 4 | 5 | 6; // For headings
+    style?: string; // For headings
     alt?: string; // For images
     caption?: string; // For images
+    author?: string; // For quotes
+    source?: string; // For quotes
   };
 }
 
 export interface HealthTip {
   id: string;
   title: string;
-  content: ContentBlock[] | Array<{ type: 'text' | 'image'; value: string; }>; // Support both formats for backward compatibility
+  content: ContentBlock[] | Array<{ type: 'text' | 'image' | 'heading' | 'quote'; value: string; metadata?: any }> | string; // Support all formats for backward compatibility
+  contentBlocks?: ContentBlock[]; // New field for explicitly storing blocks as in the API
   categoryId: string;
   categoryName?: string;
   viewCount: number;
@@ -49,6 +53,7 @@ export interface HealthTip {
   scheduledAt?: number;
   slug?: string;
   updatedAt?: number;
+  recommendationScore?: number;
 }
 
 export interface Category {

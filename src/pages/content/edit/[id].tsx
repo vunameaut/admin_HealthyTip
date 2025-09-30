@@ -33,7 +33,8 @@ import {
   VideoLibrary,
   ArrowUpward,
   ArrowDownward,
-  TextFields
+  TextFields,
+  FormatQuote
 } from '@mui/icons-material';
 import LayoutWrapper from '../../../components/LayoutWrapper';
 import AuthGuard, { useCurrentUser } from '../../../components/AuthGuard';
@@ -58,11 +59,22 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
   // State for the form
   const [title, setTitle] = useState('');
   const [excerpt, setExcerpt] = useState('');
-  const [blocks, setBlocks] = useState<Array<{ type: 'text' | 'image'; value: string; }>>([]);
+  const [blocks, setBlocks] = useState<Array<{ 
+    type: 'text' | 'image' | 'heading' | 'quote'; 
+    value: string; 
+    metadata?: {
+      level?: number;
+      style?: string;
+      caption?: string;
+      alt?: string;
+      author?: string;
+      source?: string;
+    }
+  }>>([]);
   const [category, setCategory] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [imageUrl, setImageUrl] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
+const [videoUrl, setVideoUrl] = useState('');
   const [author, setAuthor] = useState('');
   const [isFeature, setIsFeature] = useState(false);
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
@@ -82,23 +94,59 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
       setLoading(true);
       const data = await healthTipsService.getById(id as string);
       
+      // Debug thông tin
+      console.log('Health Tip data loaded:', data);
+      console.log('contentBlocks:', data?.contentBlocks);
+      console.log('content:', data?.content);
+      
       if (data) {
         setHealthTip(data);
         setTitle(data.title || '');
         setExcerpt(data.excerpt || '');
-        if (typeof data.content === 'string') {
+        // Kiểm tra contentBlocks (định dạng mới)
+        console.log('Checking contentBlocks', data.contentBlocks);
+        if (Array.isArray(data.contentBlocks)) {
+          console.log('Using contentBlocks');
+          const convertedBlocks = data.contentBlocks.map((block: any) => {
+            const value = block.value || block.content || '';
+            let type = block.type;
+            // Ensure type is one of the supported types
+            if (!['text', 'image', 'heading', 'quote'].includes(type)) {
+              type = 'text'; // Default to text for unsupported types
+            }
+            return { 
+              type: type as 'text' | 'image' | 'heading' | 'quote', 
+              value, 
+              metadata: block.metadata 
+            };
+          });
+          console.log('Converted blocks from contentBlocks:', convertedBlocks);
+          setBlocks(convertedBlocks);
+        }
+        // Kiểm tra content (định dạng cũ)
+        else if (typeof data.content === 'string') {
+          console.log('Using content as string');
           setBlocks([{ type: 'text', value: data.content }]);
         } else if (Array.isArray(data.content)) {
-          const convertedBlocks = data.content.reduce((acc: Array<{ type: 'text' | 'image'; value: string }>, block: any) => {
+          console.log('Using content as array');
+          // Format cũ có thể có content property thay vì value
+          const convertedBlocks = data.content.map((block: any) => {
             const value = block.value || block.content || '';
-            if (block.type === 'text' || block.type === 'image') {
-                acc.push({ type: block.type, value });
-            } else if (block.type === 'heading' || block.type === 'quote') { // handle other text-based types
-                acc.push({ type: 'text', value });
+            let type = block.type;
+            // Ensure type is one of the supported types
+            if (!['text', 'image', 'heading', 'quote'].includes(type)) {
+              type = 'text'; // Default to text for unsupported types
             }
-            return acc;
-          }, []);
+            return { 
+              type: type as 'text' | 'image' | 'heading' | 'quote', 
+              value, 
+              metadata: block.metadata 
+            };
+          });
+          console.log('Converted blocks from content:', convertedBlocks);
           setBlocks(convertedBlocks);
+        } else {
+          console.warn('No content or contentBlocks found!', data);
         }
         setCategory(data.categoryId || '');
         setTags(data.tags || []);
@@ -137,11 +185,26 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
 
       setSaving(true);
       const now = Date.now();
+      
+      // Convert blocks to ContentBlock format with id
+      const contentBlocks = blocks.map((block, index) => ({
+        id: `block_${index}_${now}`,
+        type: block.type,
+        value: block.value,
+        metadata: block.metadata || (
+          block.type === 'image' ? { alt: '', caption: '' } : 
+          block.type === 'heading' ? { level: 2, style: 'bold' } : 
+          block.type === 'quote' ? { author: '', source: '' } : 
+          undefined
+        )
+      }));
+      
       const updatedData = {
         ...healthTip,
         title: title.trim(),
         excerpt: excerpt.trim(),
-        content: blocks,
+        contentBlocks: contentBlocks, // Use new field contentBlocks
+        content: contentBlocks, // Keep content for backward compatibility
         categoryId: category,
         tags,
         imageUrl,
@@ -191,8 +254,16 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const handleAddBlock = (type: 'text' | 'image') => {
-    setBlocks([...blocks, { type, value: '' }]);
+  const handleAddBlock = (type: 'text' | 'image' | 'heading' | 'quote') => {
+    const newBlock = { 
+      type, 
+      value: '', 
+      metadata: type === 'image' ? { alt: '', caption: '' } : 
+                type === 'heading' ? { level: 2, style: 'bold' } : 
+                type === 'quote' ? { author: '', source: '' } : 
+                undefined
+    };
+    setBlocks([...blocks, newBlock]);
   };
 
   const handleRemoveBlock = (index: number) => {
@@ -216,9 +287,21 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
     setBlocks(newBlocks);
   };
 
-  const handleBlockChange = (index: number, value: string) => {
+  const handleBlockChange = (index: number, field: string, value: any) => {
     const newBlocks = [...blocks];
-    newBlocks[index].value = value;
+    
+    if (field === 'value') {
+      newBlocks[index].value = value;
+    } else {
+      // Handle metadata fields
+      if (!newBlocks[index].metadata) {
+        newBlocks[index].metadata = {};
+      }
+      
+      // @ts-ignore - We know the metadata object exists now
+      newBlocks[index].metadata[field] = value;
+    }
+    
     setBlocks(newBlocks);
   };
 
@@ -341,24 +424,152 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                       <Paper key={index} variant="outlined" sx={{ p: 2 }}>
                         <Grid container spacing={1} alignItems="center">
                           <Grid item xs={10}>
-                            {block.type === 'text' ? (
+                            {block.type === 'text' && (
                               <TextField
                                 label={`Khối văn bản #${index + 1}`}
                                 value={block.value}
-                                onChange={(e) => handleBlockChange(index, e.target.value)}
+                                onChange={(e) => handleBlockChange(index, 'value', e.target.value)}
                                 fullWidth
                                 multiline
                                 rows={4}
                               />
-                            ) : (
+                            )}
+                            
+                            {block.type === 'image' && (
                               <Stack spacing={1}>
                                 <TextField
                                   label={`URL hình ảnh #${index + 1}`}
                                   value={block.value}
-                                  onChange={(e) => handleBlockChange(index, e.target.value)}
+                                  onChange={(e) => handleBlockChange(index, 'value', e.target.value)}
                                   fullWidth
                                 />
-                                {block.value && <img src={block.value} alt={`Block ${index + 1}`} style={{ width: '100%', maxHeight: 200, objectFit: 'contain' }} />}
+                                <TextField
+                                  label="Alt text"
+                                  value={block.metadata?.alt || ''}
+                                  onChange={(e) => handleBlockChange(index, 'alt', e.target.value)}
+                                  fullWidth
+                                  size="small"
+                                />
+                                <TextField
+                                  label="Caption"
+                                  value={block.metadata?.caption || ''}
+                                  onChange={(e) => handleBlockChange(index, 'caption', e.target.value)}
+                                  fullWidth
+                                  size="small"
+                                />
+                                {block.value && <img 
+                                  src={block.value} 
+                                  alt={block.metadata?.alt || `Block ${index + 1}`} 
+                                  style={{ width: '100%', maxHeight: 200, objectFit: 'contain' }} 
+                                />}
+                              </Stack>
+                            )}
+                            
+                            {block.type === 'heading' && (
+                              <Stack spacing={1}>
+                                <TextField
+                                  label={`Tiêu đề #${index + 1}`}
+                                  value={block.value}
+                                  onChange={(e) => handleBlockChange(index, 'value', e.target.value)}
+                                  fullWidth
+                                />
+                                <FormControl size="small" fullWidth>
+                                  <InputLabel>Cấp độ</InputLabel>
+                                  <Select
+                                    value={block.metadata?.level || 2}
+                                    onChange={(e) => handleBlockChange(index, 'level', Number(e.target.value))}
+                                    label="Cấp độ"
+                                  >
+                                    {[1, 2, 3, 4, 5, 6].map(level => (
+                                      <MenuItem key={level} value={level}>H{level}</MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                              </Stack>
+                            )}
+                            
+                            {block.type === 'quote' && (
+                              <Stack spacing={1}>
+                                <Paper elevation={1} sx={{ 
+                                  p: 2, 
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                  bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)'
+                                }}>
+                                  <TextField
+                                    label={`Nội dung trích dẫn #${index + 1}`}
+                                    value={block.value}
+                                    onChange={(e) => handleBlockChange(index, 'value', e.target.value)}
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    variant="outlined"
+                                    sx={{
+                                      mb: 2,
+                                      '& .MuiInputBase-input': {
+                                        color: 'text.primary'
+                                      },
+                                      '& .MuiOutlinedInput-root': {
+                                        bgcolor: (theme) => theme.palette.mode === 'dark' ? theme.palette.background.paper : '#ffffff'
+                                      },
+                                      '& .MuiFormLabel-root': {
+                                        color: 'text.secondary'
+                                      }
+                                    }}
+                                  />
+                                  
+                                  <Grid container spacing={2}>
+                                    <Grid item xs={12} sm={6}>
+                                      <TextField
+                                        label="Tác giả"
+                                        value={block.metadata?.author || ''}
+                                        onChange={(e) => handleBlockChange(index, 'author', e.target.value)}
+                                        fullWidth
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{
+                                          '& .MuiOutlinedInput-root': {
+                                            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : '#ffffff'
+                                          }
+                                        }}
+                                      />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                      <TextField
+                                        label="Nguồn"
+                                        value={block.metadata?.source || ''}
+                                        onChange={(e) => handleBlockChange(index, 'source', e.target.value)}
+                                        fullWidth
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{
+                                          '& .MuiOutlinedInput-root': {
+                                            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : '#ffffff'
+                                          }
+                                        }}
+                                      />
+                                    </Grid>
+                                  </Grid>
+                                </Paper>
+                                
+                                {block.value && (
+                                  <Paper elevation={0} sx={{ 
+                                    p: 2, 
+                                    borderLeft: '4px solid #4CAF50', 
+                                    bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f5f5f5',
+                                    my: 1
+                                  }}>
+                                    <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                                      "{block.value}"
+                                    </Typography>
+                                    {block.metadata?.author && (
+                                      <Typography variant="body2" sx={{ mt: 1, textAlign: 'right', fontWeight: 'bold', color: 'text.secondary' }}>
+                                        — {block.metadata.author}
+                                        {block.metadata?.source && `, ${block.metadata.source}`}
+                                      </Typography>
+                                    )}
+                                  </Paper>
+                                )}
                               </Stack>
                             )}
                           </Grid>
@@ -379,9 +590,11 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
                       </Paper>
                     ))}
 
-                    <Stack direction="row" spacing={2}>
+                    <Stack direction="row" spacing={2} flexWrap="wrap">
                       <Button onClick={() => handleAddBlock('text')} startIcon={<TextFields />}>Thêm văn bản</Button>
+                      <Button onClick={() => handleAddBlock('heading')} startIcon={<Article />}>Thêm tiêu đề</Button>
                       <Button onClick={() => handleAddBlock('image')} startIcon={<Image />}>Thêm hình ảnh</Button>
+                      <Button onClick={() => handleAddBlock('quote')} startIcon={<FormatQuote />}>Thêm trích dẫn</Button>
                     </Stack>
 
                   </Stack>
