@@ -48,7 +48,12 @@ interface Category {
   imageUrl?: string;
 }
 
-export default function CategoriesPage() {
+interface CategoriesPageProps {
+  darkMode?: boolean;
+  toggleDarkMode?: () => void;
+}
+
+export default function CategoriesPage({ darkMode, toggleDarkMode }: CategoriesPageProps) {
   const { currentUser, loading: userLoading } = useCurrentUser();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,7 +211,7 @@ export default function CategoriesPage() {
 
   return (
     <AuthGuard>
-      <LayoutWrapper>
+      <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
         <Box sx={{ flexGrow: 1, p: 3 }}>
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
