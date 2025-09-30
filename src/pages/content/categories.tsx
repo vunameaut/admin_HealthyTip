@@ -45,6 +45,7 @@ interface Category {
   count: number;
   createdAt: number;
   updatedAt: number;
+  imageUrl?: string;
 }
 
 export default function CategoriesPage() {
@@ -57,6 +58,7 @@ export default function CategoriesPage() {
     name: '',
     description: '',
     color: '#4CAF50',
+    imageUrl: '',
   });
 
   useEffect(() => {
@@ -64,6 +66,36 @@ export default function CategoriesPage() {
       loadCategories();
     }
   }, [currentUser, userLoading]);
+
+  // Effect to handle returning from media selection
+  useEffect(() => {
+    // Check if we're returning from media selection
+    const selectedImageUrl = sessionStorage.getItem('selectedImageUrl');
+    const savedFormData = sessionStorage.getItem('editingCategoryData');
+    
+    if (selectedImageUrl && savedFormData) {
+      try {
+        // Restore the form state
+        const savedData = JSON.parse(savedFormData);
+        // Update with the selected image
+        setFormData({
+          ...savedData,
+          imageUrl: selectedImageUrl
+        });
+        
+        // If dialog wasn't open, open it
+        if (!openDialog) {
+          setOpenDialog(true);
+        }
+        
+        // Clear the session storage
+        sessionStorage.removeItem('selectedImageUrl');
+        sessionStorage.removeItem('editingCategoryData');
+      } catch (error) {
+        console.error('Error parsing saved form data:', error);
+      }
+    }
+  }, []);
 
   const loadCategories = async () => {
     try {
@@ -94,6 +126,7 @@ export default function CategoriesPage() {
         name: category.name,
         description: category.description,
         color: category.color,
+        imageUrl: category.imageUrl || '',
       });
     } else {
       setEditingCategory(null);
@@ -101,6 +134,7 @@ export default function CategoriesPage() {
         name: '',
         description: '',
         color: '#4CAF50',
+        imageUrl: '',
       });
     }
     setOpenDialog(true);
@@ -113,6 +147,7 @@ export default function CategoriesPage() {
       name: '',
       description: '',
       color: '#4CAF50',
+      imageUrl: '',
     });
   };
 
@@ -128,6 +163,7 @@ export default function CategoriesPage() {
         name: formData.name.trim(),
         description: formData.description.trim(),
         color: formData.color,
+        imageUrl: formData.imageUrl.trim(),
         updatedAt: now,
         ...(editingCategory ? {} : { createdAt: now, count: 0 }),
       };
@@ -258,6 +294,7 @@ export default function CategoriesPage() {
                         <TableCell>Tên danh mục</TableCell>
                         <TableCell>Mô tả</TableCell>
                         <TableCell align="center">Màu sắc</TableCell>
+                        <TableCell align="center">Hình ảnh</TableCell>
                         <TableCell align="center">Số bài viết</TableCell>
                         <TableCell align="center">Ngày tạo</TableCell>
                         <TableCell align="center">Thao tác</TableCell>
@@ -286,6 +323,27 @@ export default function CategoriesPage() {
                               }}
                               label={category.color}
                             />
+                          </TableCell>
+                          <TableCell align="center">
+                            {category.imageUrl ? (
+                              <Box
+                                component="img"
+                                src={category.imageUrl}
+                                alt={category.name}
+                                sx={{
+                                  width: 60,
+                                  height: 60,
+                                  objectFit: 'contain',
+                                  borderRadius: 1,
+                                  border: '1px solid',
+                                  borderColor: 'divider'
+                                }}
+                              />
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                Không có ảnh
+                              </Typography>
+                            )}
                           </TableCell>
                           <TableCell align="center">
                             <Typography variant="body2">
@@ -353,6 +411,63 @@ export default function CategoriesPage() {
                   multiline
                   rows={3}
                 />
+                <Box>
+                  <TextField
+                    label="URL hình ảnh"
+                    value={formData.imageUrl}
+                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    fullWidth
+                    sx={{
+                      mb: 1,
+                      '& .MuiInputBase-root': {
+                        bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                      }
+                    }}
+                    InputProps={{
+                      startAdornment: <img src="/images/logos/cu_black_rmbg.png" width="20" height="20" style={{ marginRight: 8 }} />
+                    }}
+                  />
+                  <Button 
+                    variant="outlined" 
+                    color="primary" 
+                    onClick={() => {
+                      // Save current state to sessionStorage
+                      sessionStorage.setItem('editingCategoryData', JSON.stringify(formData));
+                      // Navigate to media library with returnTo parameter
+                      window.location.href = `/media?returnTo=${encodeURIComponent('/content/categories')}`;
+                    }}
+                    fullWidth
+                    sx={{ mb: 2 }}
+                  >
+                    Chọn ảnh từ thư viện
+                  </Button>
+                  {formData.imageUrl && (
+                    <Box 
+                      sx={{ 
+                        width: '100%', 
+                        height: 200, 
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                        mb: 2
+                      }}
+                    >
+                      <img 
+                        src={formData.imageUrl} 
+                        alt={formData.name} 
+                        style={{ 
+                          maxWidth: '100%', 
+                          maxHeight: '100%', 
+                          objectFit: 'contain' 
+                        }} 
+                      />
+                    </Box>
+                  )}
+                </Box>
                 <TextField
                   label="Màu sắc"
                   type="color"

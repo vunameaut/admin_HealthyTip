@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import {
   Box,
   Card,
@@ -58,6 +59,8 @@ export default function MediaLibrary({
   categoryFilter,
   typeFilter = 'all'
 }: MediaLibraryProps) {
+  const router = useRouter();
+  const { returnTo } = router.query;
   const [media, setMedia] = useState<Media[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,11 +119,25 @@ export default function MediaLibrary({
 
   const totalPages = Math.ceil(filteredMedia.length / itemsPerPage);
 
+  // Handle media selection and return to previous page if needed
   const handleMediaClick = (mediaItem: Media) => {
-    if (selectionMode) {
+    setSelectedMedia(mediaItem);
+    
+    // If we're in selection mode with a callback, use that
+    if (selectionMode && onMediaSelect) {
       onMediaSelect?.(mediaItem);
+      return;
+    }
+    
+    // If we have a returnTo parameter, store the selected URL and navigate back
+    if (typeof returnTo === 'string' && returnTo) {
+      // Store the selected image URL in session storage
+      sessionStorage.setItem('selectedImageUrl', mediaItem.secure_url);
+      
+      // Navigate back to the return URL
+      router.push(returnTo);
     } else {
-      setSelectedMedia(mediaItem);
+      // If not returning anywhere, just show the preview dialog
       setPreviewDialogOpen(true);
     }
   };
@@ -280,7 +297,31 @@ export default function MediaLibrary({
                   onClick={() => handleMediaClick(mediaItem)}
                 >
                   {/* Media Preview */}
-                  <Box sx={{ position: 'relative', paddingTop: '75%' }}>
+                  <Box 
+                    sx={{ 
+                      position: 'relative', 
+                      paddingTop: '75%',
+                      cursor: returnTo ? 'pointer' : 'default',
+                      '&:hover': returnTo ? {
+                        '&::after': {
+                          content: '""',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                        }
+                      } : {}
+                    }}
+                    onClick={() => returnTo && handleMediaClick(mediaItem)}
+                  >
                     <Box
                       component="img"
                       src={mediaItem.type === 'video' ? mediaItem.thumbnail_url : mediaItem.secure_url}
@@ -294,6 +335,28 @@ export default function MediaLibrary({
                         objectFit: 'cover'
                       }}
                     />
+                    {returnTo && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          opacity: 0,
+                          transition: 'opacity 0.2s',
+                          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                          color: 'white',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          pointerEvents: 'none',
+                          '.MuiBox-root:hover &': {
+                            opacity: 1
+                          }
+                        }}
+                      >
+                        Chọn ảnh này
+                      </Box>
+                    )}
 
                     {/* Type Icon */}
                     <Box

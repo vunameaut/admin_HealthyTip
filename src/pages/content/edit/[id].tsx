@@ -86,6 +86,31 @@ const [videoUrl, setVideoUrl] = useState('');
       loadCategories();
     }
   }, [currentUser, userLoading, id]);
+  
+  // Xử lý khi quay trở lại từ media library
+  useEffect(() => {
+    // Kiểm tra xem có URL ảnh được chọn từ media library không
+    const selectedImageUrl = sessionStorage.getItem('selectedImageUrl');
+    if (selectedImageUrl) {
+      // Kiểm tra xem đang chỉnh sửa block hay ảnh đại diện
+      const editingBlockIndex = sessionStorage.getItem('editingImageBlock');
+      
+      if (editingBlockIndex !== null) {
+        // Cập nhật block ảnh
+        const index = parseInt(editingBlockIndex);
+        if (!isNaN(index) && index >= 0 && index < blocks.length) {
+          handleBlockChange(index, 'value', selectedImageUrl);
+        }
+        sessionStorage.removeItem('editingImageBlock');
+      } else {
+        // Cập nhật ảnh đại diện
+        setImageUrl(selectedImageUrl);
+      }
+      
+      // Xóa thông tin đã lưu
+      sessionStorage.removeItem('selectedImageUrl');
+    }
+  }, [router.asPath, blocks]);
 
   const loadHealthTip = async () => {
     if (!id) return;
@@ -170,6 +195,7 @@ const [videoUrl, setVideoUrl] = useState('');
   const loadCategories = async () => {
     try {
       const categoriesList = await categoriesService.getAll();
+      console.log('Loaded categories:', categoriesList);
       setCategories(categoriesList);
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -437,18 +463,47 @@ const [videoUrl, setVideoUrl] = useState('');
                             
                             {block.type === 'image' && (
                               <Stack spacing={1}>
-                                <TextField
-                                  label={`URL hình ảnh #${index + 1}`}
-                                  value={block.value}
-                                  onChange={(e) => handleBlockChange(index, 'value', e.target.value)}
-                                  fullWidth
-                                />
+                                <Stack direction="row" spacing={1}>
+                                  <TextField
+                                    label={`URL hình ảnh #${index + 1}`}
+                                    value={block.value}
+                                    onChange={(e) => handleBlockChange(index, 'value', e.target.value)}
+                                    fullWidth
+                                    sx={{
+                                      '& .MuiInputBase-root': {
+                                        bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                                      },
+                                      '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'divider'
+                                      }
+                                    }}
+                                  />
+                                  <Button 
+                                    variant="outlined" 
+                                    onClick={() => {
+                                      // Lưu vị trí block đang được chỉnh sửa vào sessionStorage
+                                      sessionStorage.setItem('editingImageBlock', index.toString());
+                                      router.push('/media?returnTo=' + encodeURIComponent(`/content/edit/${id}`));
+                                    }}
+                                    sx={{ whiteSpace: 'nowrap' }}
+                                  >
+                                    Chọn ảnh
+                                  </Button>
+                                </Stack>
                                 <TextField
                                   label="Alt text"
                                   value={block.metadata?.alt || ''}
                                   onChange={(e) => handleBlockChange(index, 'alt', e.target.value)}
                                   fullWidth
                                   size="small"
+                                  sx={{
+                                    '& .MuiInputBase-root': {
+                                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                                    },
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                      borderColor: 'divider'
+                                    }
+                                  }}
                                 />
                                 <TextField
                                   label="Caption"
@@ -456,12 +511,45 @@ const [videoUrl, setVideoUrl] = useState('');
                                   onChange={(e) => handleBlockChange(index, 'caption', e.target.value)}
                                   fullWidth
                                   size="small"
+                                  sx={{
+                                    '& .MuiInputBase-root': {
+                                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                                    },
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                      borderColor: 'divider'
+                                    }
+                                  }}
                                 />
-                                {block.value && <img 
-                                  src={block.value} 
-                                  alt={block.metadata?.alt || `Block ${index + 1}`} 
-                                  style={{ width: '100%', maxHeight: 200, objectFit: 'contain' }} 
-                                />}
+                                {block.value && (
+                                  <Paper 
+                                    elevation={0} 
+                                    variant="outlined" 
+                                    sx={{ 
+                                      p: 1, 
+                                      borderColor: 'divider',
+                                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f8f8f8' 
+                                    }}
+                                  >
+                                    <img 
+                                      src={block.value} 
+                                      alt={block.metadata?.alt || `Block ${index + 1}`} 
+                                      style={{ width: '100%', maxHeight: 200, objectFit: 'contain' }} 
+                                    />
+                                    {block.metadata?.caption && (
+                                      <Typography 
+                                        variant="caption" 
+                                        sx={{ 
+                                          display: 'block', 
+                                          textAlign: 'center', 
+                                          mt: 0.5,
+                                          color: 'text.secondary'
+                                        }}
+                                      >
+                                        {block.metadata.caption}
+                                      </Typography>
+                                    )}
+                                  </Paper>
+                                )}
                               </Stack>
                             )}
                             
@@ -648,15 +736,35 @@ const [videoUrl, setVideoUrl] = useState('');
                     
                     <Stack spacing={2}>
                       <FormControl fullWidth>
-                        <InputLabel>Danh mục</InputLabel>
+                        <InputLabel sx={{ color: 'text.secondary' }}>Danh mục</InputLabel>
                         <Select
                           value={category}
                           onChange={(e) => setCategory(e.target.value)}
                           label="Danh mục"
+                          sx={{
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'divider'
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.main'
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.main'
+                            },
+                            color: 'text.primary',
+                            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent'
+                          }}
+                          MenuProps={{
+                            PaperProps: {
+                              sx: {
+                                bgcolor: (theme) => theme.palette.mode === 'dark' ? 'background.paper' : '#fff'
+                              }
+                            }
+                          }}
                         >
                           <MenuItem value="">Chọn danh mục</MenuItem>
                           {categories.map((cat) => (
-                            <MenuItem key={cat.id} value={cat.name}>
+                            <MenuItem key={cat.id} value={cat.id}>
                               {cat.name}
                             </MenuItem>
                           ))}
@@ -689,6 +797,18 @@ const [videoUrl, setVideoUrl] = useState('');
                           onChange={(e) => setNewTag(e.target.value)}
                           size="small"
                           onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                          sx={{
+                            '& .MuiInputBase-root': {
+                              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                              color: 'text.primary'
+                            },
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'divider'
+                            },
+                            '& .MuiInputLabel-root': {
+                              color: 'text.secondary'
+                            }
+                          }}
                         />
                         <Button
                           variant="outlined"
@@ -709,6 +829,17 @@ const [videoUrl, setVideoUrl] = useState('');
                             deleteIcon={<Remove />}
                             variant="outlined"
                             size="small"
+                            sx={{
+                              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f5f5f5',
+                              borderColor: 'divider',
+                              color: 'text.primary',
+                              '& .MuiChip-deleteIcon': {
+                                color: 'text.secondary',
+                                '&:hover': {
+                                  color: 'error.main'
+                                }
+                              }
+                            }}
                           />
                         ))}
                       </Box>
@@ -724,16 +855,48 @@ const [videoUrl, setVideoUrl] = useState('');
                     </Typography>
                     
                     <Stack spacing={2}>
-                      <TextField
-                        label="URL hình ảnh"
-                        value={imageUrl}
-                        onChange={(e) => setImageUrl(e.target.value)}
-                        fullWidth
-                        variant="outlined"
-                        InputProps={{
-                          startAdornment: <Image sx={{ mr: 1, color: 'text.secondary' }} />,
-                        }}
-                      />
+                      <Stack spacing={1}>
+                        <TextField
+                          label="URL hình ảnh"
+                          value={imageUrl}
+                          onChange={(e) => setImageUrl(e.target.value)}
+                          fullWidth
+                          variant="outlined"
+                          InputProps={{
+                            startAdornment: <Image sx={{ mr: 1, color: 'text.secondary' }} />,
+                          }}
+                          sx={{
+                            '& .MuiInputBase-root': {
+                              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                              color: 'text.primary'
+                            },
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'divider'
+                            },
+                            '& .MuiInputLabel-root': {
+                              color: 'text.secondary'
+                            }
+                          }}
+                        />
+                        <Button 
+                          variant="outlined" 
+                          color="primary" 
+                          onClick={() => router.push('/media?returnTo=' + encodeURIComponent(`/content/edit/${id}`))}
+                          startIcon={<Image />}
+                          fullWidth
+                        >
+                          Chọn ảnh từ thư viện
+                        </Button>
+                        {imageUrl && (
+                          <Box sx={{ mt: 1, p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                            <img 
+                              src={imageUrl} 
+                              alt="Ảnh đại diện" 
+                              style={{ width: '100%', height: 'auto', maxHeight: '150px', objectFit: 'contain' }} 
+                            />
+                          </Box>
+                        )}
+                      </Stack>
                       
                       <TextField
                         label="URL video"
@@ -743,6 +906,18 @@ const [videoUrl, setVideoUrl] = useState('');
                         variant="outlined"
                         InputProps={{
                           startAdornment: <VideoLibrary sx={{ mr: 1, color: 'text.secondary' }} />,
+                        }}
+                        sx={{
+                          '& .MuiInputBase-root': {
+                            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                            color: 'text.primary'
+                          },
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'divider'
+                          },
+                          '& .MuiInputLabel-root': {
+                            color: 'text.secondary'
+                          }
                         }}
                       />
                     </Stack>
