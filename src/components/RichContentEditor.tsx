@@ -71,7 +71,7 @@ export default function RichContentEditor({
 
     // Only add metadata for heading blocks
     if (type === 'heading') {
-      newBlock.metadata = { level: 2 };
+      newBlock.metadata = { level: 2 as 1 | 2 | 3 | 4 | 5 | 6 };
     }
 
     const newContent = [...content];

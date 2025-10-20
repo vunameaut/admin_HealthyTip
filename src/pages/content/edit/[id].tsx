@@ -63,7 +63,7 @@ export default function EditHealthTipPage({ darkMode, toggleDarkMode }: EditHeal
     type: 'text' | 'image' | 'heading' | 'quote'; 
     value: string; 
     metadata?: {
-      level?: number;
+      level?: 1 | 2 | 3 | 4 | 5 | 6;
       style?: string;
       caption?: string;
       alt?: string;
@@ -219,7 +219,7 @@ const [videoUrl, setVideoUrl] = useState('');
         value: block.value,
         metadata: block.metadata || (
           block.type === 'image' ? { alt: '', caption: '' } : 
-          block.type === 'heading' ? { level: 2, style: 'bold' } : 
+          block.type === 'heading' ? { level: 2 as 1 | 2 | 3 | 4 | 5 | 6, style: 'bold' } : 
           block.type === 'quote' ? { author: '', source: '' } : 
           undefined
         )
@@ -285,7 +285,7 @@ const [videoUrl, setVideoUrl] = useState('');
       type, 
       value: '', 
       metadata: type === 'image' ? { alt: '', caption: '' } : 
-                type === 'heading' ? { level: 2, style: 'bold' } : 
+                type === 'heading' ? { level: 2 as 1 | 2 | 3 | 4 | 5 | 6, style: 'bold' } : 
                 type === 'quote' ? { author: '', source: '' } : 
                 undefined
     };
@@ -324,8 +324,16 @@ const [videoUrl, setVideoUrl] = useState('');
         newBlocks[index].metadata = {};
       }
       
-      // @ts-ignore - We know the metadata object exists now
-      newBlocks[index].metadata[field] = value;
+      // Type-safe handling for level field
+      if (field === 'level') {
+        const levelValue = Number(value);
+        if (levelValue >= 1 && levelValue <= 6) {
+          newBlocks[index].metadata.level = levelValue as 1 | 2 | 3 | 4 | 5 | 6;
+        }
+      } else {
+        // @ts-ignore - We know the metadata object exists now
+        newBlocks[index].metadata[field] = value;
+      }
     }
     
     setBlocks(newBlocks);
