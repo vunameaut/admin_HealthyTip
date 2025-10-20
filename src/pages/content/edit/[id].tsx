@@ -139,10 +139,41 @@ const [videoUrl, setVideoUrl] = useState('');
             if (!['text', 'image', 'heading', 'quote'].includes(type)) {
               type = 'text'; // Default to text for unsupported types
             }
+            
+            // Ensure metadata is never undefined
+            let metadata = {};
+            if (block.metadata) {
+              if (type === 'image') {
+                metadata = {
+                  alt: block.metadata.alt || '',
+                  caption: block.metadata.caption || ''
+                };
+              } else if (type === 'heading') {
+                metadata = {
+                  level: block.metadata.level || 2 as 1 | 2 | 3 | 4 | 5 | 6,
+                  style: block.metadata.style || 'bold'
+                };
+              } else if (type === 'quote') {
+                metadata = {
+                  author: block.metadata.author || '',
+                  source: block.metadata.source || ''
+                };
+              }
+            } else {
+              // Set default metadata based on type
+              if (type === 'image') {
+                metadata = { alt: '', caption: '' };
+              } else if (type === 'heading') {
+                metadata = { level: 2 as 1 | 2 | 3 | 4 | 5 | 6, style: 'bold' };
+              } else if (type === 'quote') {
+                metadata = { author: '', source: '' };
+              }
+            }
+            
             return { 
               type: type as 'text' | 'image' | 'heading' | 'quote', 
               value, 
-              metadata: block.metadata 
+              metadata 
             };
           });
           console.log('Converted blocks from contentBlocks:', convertedBlocks);
@@ -162,16 +193,49 @@ const [videoUrl, setVideoUrl] = useState('');
             if (!['text', 'image', 'heading', 'quote'].includes(type)) {
               type = 'text'; // Default to text for unsupported types
             }
+            
+            // Ensure metadata is never undefined
+            let metadata = {};
+            if (block.metadata) {
+              if (type === 'image') {
+                metadata = {
+                  alt: block.metadata.alt || '',
+                  caption: block.metadata.caption || ''
+                };
+              } else if (type === 'heading') {
+                metadata = {
+                  level: block.metadata.level || 2 as 1 | 2 | 3 | 4 | 5 | 6,
+                  style: block.metadata.style || 'bold'
+                };
+              } else if (type === 'quote') {
+                metadata = {
+                  author: block.metadata.author || '',
+                  source: block.metadata.source || ''
+                };
+              }
+            } else {
+              // Set default metadata based on type
+              if (type === 'image') {
+                metadata = { alt: '', caption: '' };
+              } else if (type === 'heading') {
+                metadata = { level: 2 as 1 | 2 | 3 | 4 | 5 | 6, style: 'bold' };
+              } else if (type === 'quote') {
+                metadata = { author: '', source: '' };
+              }
+            }
+            
             return { 
               type: type as 'text' | 'image' | 'heading' | 'quote', 
               value, 
-              metadata: block.metadata 
+              metadata 
             };
           });
           console.log('Converted blocks from content:', convertedBlocks);
           setBlocks(convertedBlocks);
         } else {
           console.warn('No content or contentBlocks found!', data);
+          // Set default empty text block if no content exists
+          setBlocks([{ type: 'text', value: '', metadata: {} }]);
         }
         setCategory(data.categoryId || '');
         setTags(data.tags || []);
@@ -209,44 +273,89 @@ const [videoUrl, setVideoUrl] = useState('');
         return;
       }
 
+      if (!category) {
+        toast.error('Vui lòng chọn danh mục');
+        return;
+      }
+
+      if (blocks.length === 0) {
+        toast.error('Vui lòng thêm nội dung cho bài viết');
+        return;
+      }
+
       setSaving(true);
       const now = Date.now();
       
       // Convert blocks to ContentBlock format with id
-      const contentBlocks = blocks.map((block, index) => ({
-        id: `block_${index}_${now}`,
-        type: block.type,
-        value: block.value,
-        metadata: block.metadata || (
-          block.type === 'image' ? { alt: '', caption: '' } : 
-          block.type === 'heading' ? { level: 2 as 1 | 2 | 3 | 4 | 5 | 6, style: 'bold' } : 
-          block.type === 'quote' ? { author: '', source: '' } : 
-          undefined
-        )
-      }));
+      const contentBlocks = blocks.map((block, index) => {
+        // Ensure metadata is never undefined
+        let metadata = {};
+        
+        if (block.type === 'image') {
+          metadata = {
+            alt: block.metadata?.alt || '',
+            caption: block.metadata?.caption || ''
+          };
+        } else if (block.type === 'heading') {
+          metadata = {
+            level: block.metadata?.level || 2 as 1 | 2 | 3 | 4 | 5 | 6,
+            style: block.metadata?.style || 'bold'
+          };
+        } else if (block.type === 'quote') {
+          metadata = {
+            author: block.metadata?.author || '',
+            source: block.metadata?.source || ''
+          };
+        }
+        
+        return {
+          id: `block_${index}_${now}`,
+          type: block.type,
+          value: block.value || '',
+          metadata
+        };
+      });
       
+      // Create clean update data without potential conflicting fields
       const updatedData = {
-        ...healthTip,
         title: title.trim(),
         excerpt: excerpt.trim(),
         contentBlocks: contentBlocks, // Use new field contentBlocks
         content: contentBlocks, // Keep content for backward compatibility
         categoryId: category,
-        tags,
-        imageUrl,
-        author,
-        isFeature,
-        status,
+        tags: tags || [],
+        imageUrl: imageUrl || '',
+        author: author || '',
+        isFeature: isFeature || false,
+        status: status || 'draft',
         updatedAt: now,
+        // Keep original creation data if exists
+        createdAt: healthTip?.createdAt || now,
+        viewCount: healthTip?.viewCount || 0,
+        likeCount: healthTip?.likeCount || 0,
       };
 
+      console.log('Updating with data:', updatedData);
+      console.log('ID:', id);
+      
       await healthTipsService.update(id as string, updatedData);
       
       toast.success('Cập nhật bài viết thành công!');
       router.push('/content');
     } catch (error) {
       console.error('Error updating health tip:', error);
-      toast.error('Có lỗi khi cập nhật bài viết');
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        errorObject: error
+      });
+      
+      let errorMessage = 'Có lỗi khi cập nhật bài viết';
+      if (error instanceof Error) {
+        errorMessage += `: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -281,13 +390,20 @@ const [videoUrl, setVideoUrl] = useState('');
   };
 
   const handleAddBlock = (type: 'text' | 'image' | 'heading' | 'quote') => {
+    let metadata = {};
+    
+    if (type === 'image') {
+      metadata = { alt: '', caption: '' };
+    } else if (type === 'heading') {
+      metadata = { level: 2 as 1 | 2 | 3 | 4 | 5 | 6, style: 'bold' };
+    } else if (type === 'quote') {
+      metadata = { author: '', source: '' };
+    }
+    
     const newBlock = { 
       type, 
       value: '', 
-      metadata: type === 'image' ? { alt: '', caption: '' } : 
-                type === 'heading' ? { level: 2 as 1 | 2 | 3 | 4 | 5 | 6, style: 'bold' } : 
-                type === 'quote' ? { author: '', source: '' } : 
-                undefined
+      metadata
     };
     setBlocks([...blocks, newBlock]);
   };
@@ -317,9 +433,9 @@ const [videoUrl, setVideoUrl] = useState('');
     const newBlocks = [...blocks];
     
     if (field === 'value') {
-      newBlocks[index].value = value;
+      newBlocks[index].value = value || '';
     } else {
-      // Handle metadata fields
+      // Handle metadata fields - ensure metadata exists
       if (!newBlocks[index].metadata) {
         newBlocks[index].metadata = {};
       }
@@ -331,8 +447,12 @@ const [videoUrl, setVideoUrl] = useState('');
           newBlocks[index].metadata.level = levelValue as 1 | 2 | 3 | 4 | 5 | 6;
         }
       } else {
-        // @ts-ignore - We know the metadata object exists now
-        newBlocks[index].metadata[field] = value;
+        // Ensure we don't set undefined values
+        const cleanValue = value === undefined || value === null ? '' : value;
+        // Type-safe metadata assignment
+        if (field === 'alt' || field === 'caption' || field === 'author' || field === 'source' || field === 'style') {
+          (newBlocks[index].metadata as any)[field] = cleanValue;
+        }
       }
     }
     
