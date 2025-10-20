@@ -93,7 +93,7 @@ export default function CategoriesPage({ darkMode, toggleDarkMode }: CategoriesP
           setOpenDialog(true);
         }
         
-        // Clear the session storage
+        // Clear the session storage test commit
         sessionStorage.removeItem('selectedImageUrl');
         sessionStorage.removeItem('editingCategoryData');
       } catch (error) {
