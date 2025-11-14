@@ -37,6 +37,7 @@ import MediaUploadForm from '../../components/MediaUploadForm';
 import { healthTipsService, categoriesService } from '../../services/firebase';
 import { HealthTip, Media } from '../../types';
 import toast from 'react-hot-toast';
+import notificationService from '../../services/notificationService';
 
 interface CreateHealthTipPageProps {
   darkMode?: boolean;
@@ -60,6 +61,7 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
   const [isFeature, setIsFeature] = useState(false);
   const [uploadedMedia, setUploadedMedia] = useState<Media[]>([]);
   const [showMediaUpload, setShowMediaUpload] = useState(false);
+  const [sendNotification, setSendNotification] = useState(false);
 
   useEffect(() => {
     loadCategories();
@@ -145,9 +147,26 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
         newHealthTip.publishedAt = now;
       }
 
-      await healthTipsService.create(newHealthTip as Omit<HealthTip, 'id'>);
-      
+      const newTipId = await healthTipsService.create(newHealthTip as Omit<HealthTip, 'id'>);
+
       toast.success('Tạo bài viết thành công!');
+
+      // Gửi thông báo nếu đã xuất bản và được chọn
+      if (status === 'published' && sendNotification) {
+        try {
+          const result = await notificationService.sendNewHealthTip({
+            healthTipId: newTipId,
+          });
+
+          if (result.success) {
+            toast.success(`Đã gửi thông báo đến ${result.sentCount || 0} người dùng!`);
+          }
+        } catch (error) {
+          console.error('Error sending notification:', error);
+          toast.error('Bài viết đã được tạo nhưng gửi thông báo thất bại');
+        }
+      }
+
       router.push('/content');
     } catch (error) {
       console.error('Error creating health tip:', error);
@@ -273,6 +292,21 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
                       }
                       label="Bài viết nổi bật"
                     />
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={sendNotification}
+                          onChange={(e) => setSendNotification(e.target.checked)}
+                          disabled={status !== 'published'}
+                        />
+                      }
+                      label="Gửi thông báo đến người dùng"
+                    />
+                    {status !== 'published' && sendNotification && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        * Chỉ gửi thông báo khi bài viết được xuất bản
+                      </Typography>
+                    )}
                   </CardContent>
                 </Card>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import {
   Box,
@@ -185,7 +185,7 @@ export default function DashboardLayout({
       title: 'Thông báo & Chiến dịch',
       icon: Campaign,
       subItems: [
-        { id: 'notifications', title: 'Push Notifications', icon: Notifications, path: '/settings/notifications' },
+        { id: 'notifications', title: 'Push Notifications', icon: Notifications, path: '/notifications' },
         { id: 'email-campaigns', title: 'Email Campaigns', icon: Campaign, path: '/settings/campaigns' },
         { id: 'segmentation', title: 'User Segmentation', icon: People, path: '/users/segmentation' },
         { id: 'campaign-analytics', title: 'Campaign Analytics', icon: Analytics, path: '/analytics/campaigns' },
