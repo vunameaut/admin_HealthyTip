@@ -57,3 +57,4 @@ cloudinary-config.json
 # Custom
 uploads/
 *.backup
+.vercel
