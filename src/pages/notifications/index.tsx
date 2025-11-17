@@ -44,9 +44,11 @@ import {
   Settings,
   Close,
   Search,
+  AutoAwesome,
 } from '@mui/icons-material';
 import LayoutWrapper from '@/components/LayoutWrapper';
 import AuthGuard from '@/components/AuthGuard';
+import RecommendationsTab from '@/components/RecommendationsTab';
 import notificationService, {
   User,
   Stats,
@@ -66,6 +68,7 @@ export default function NotificationsPage() {
   const [history, setHistory] = useState<NotificationHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(false);
 
   // Pagination for history
   const [page, setPage] = useState(0);
@@ -540,7 +543,64 @@ export default function NotificationsPage() {
                 </CardContent>
               </Card>
             </Grid>
+
+            <Grid item xs={12}>
+              <Card
+                elevation={0}
+                sx={{
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
+                  background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.05)} 0%, ${alpha(
+                    theme.palette.warning.main,
+                    0.01
+                  )} 100%)`,
+                  transition: 'all 0.3s',
+                  '&:hover': {
+                    boxShadow: `0 8px 24px ${alpha(theme.palette.warning.main, 0.15)}`,
+                    transform: 'translateY(-4px)',
+                  },
+                }}
+              >
+                <CardContent sx={{ textAlign: 'center', py: 5 }}>
+                  <Avatar
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      mx: 'auto',
+                      mb: 3,
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                    }}
+                  >
+                    <AutoAwesome sx={{ fontSize: 48, color: 'warning.main' }} />
+                  </Avatar>
+                  <Typography variant="h5" fontWeight="bold" gutterBottom>
+                    🤖 AI Recommendation Engine
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ mb: 4 }}>
+                    Tạo đề xuất thông minh dựa trên hành vi và sở thích người dùng
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    color="warning"
+                    startIcon={<AutoAwesome />}
+                    onClick={() => setShowRecommendations(!showRecommendations)}
+                    sx={{ px: 4, py: 1.5, borderRadius: 2 }}
+                  >
+                    {showRecommendations ? 'Ẩn' : 'Mở'} Recommendation Engine
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
+
+          {/* Recommendations Section */}
+          {showRecommendations && (
+            <Card elevation={0} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.1)}`, mb: 4 }}>
+              <CardContent>
+                <RecommendationsTab users={users} />
+              </CardContent>
+            </Card>
+          )}
 
           {/* History Section */}
           <Card elevation={0} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>

@@ -203,6 +203,104 @@ class NotificationService {
       return { success: false, message: 'Cannot connect to backend server' };
     }
   }
+
+  // ============ RECOMMENDATION METHODS ============
+
+  // Generate recommendations cho 1 user
+  async generateRecommendationsForUser(data: {
+    userId: string;
+    limit?: number;
+    sendNotification?: boolean;
+    algorithm?: 'content' | 'collaborative' | 'trending' | 'hybrid';
+  }): Promise<{
+    success: boolean;
+    userId: string;
+    recommendations: Array<{
+      healthTipId: string;
+      title: string;
+      score: number;
+      reasons: string[];
+    }>;
+    algorithm: string;
+    totalRecommendations: number;
+    error?: string;
+  }> {
+    const response = await apiClient.post('/recommendations/generate-auto', data);
+    return response.data;
+  }
+
+  // Generate recommendations cho tất cả users (batch)
+  async generateBatchRecommendations(data: {
+    sendNotifications?: boolean;
+    maxUsers?: number;
+    algorithm?: 'content' | 'collaborative' | 'trending' | 'hybrid';
+  }): Promise<{
+    success: boolean;
+    message: string;
+    results: {
+      totalUsers: number;
+      successCount: number;
+      failureCount: number;
+      errorCount: number;
+    };
+    errors?: Array<{ userId: string; error: string }>;
+  }> {
+    const response = await apiClient.post('/recommendations/batch-generate', data);
+    return response.data;
+  }
+
+  // Lấy recommendations đã generate cho user
+  async getUserRecommendations(userId: string): Promise<{
+    success: boolean;
+    recommendations: any[];
+    generatedAt?: number;
+    expiresAt?: number;
+  }> {
+    try {
+      const response = await apiClient.get(`/recommendations/user/${userId}`);
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        recommendations: []
+      };
+    }
+  }
+
+  // Lấy lịch sử recommendations
+  async getRecommendationsHistory(params?: {
+    userId?: string;
+    limit?: number;
+  }): Promise<{
+    success: boolean;
+    recommendations: Array<{
+      userId: string;
+      userEmail?: string;
+      username?: string;
+      recommendations: any[];
+      recommendationsCount: number;
+      generatedAt: number;
+      expiresAt: number;
+      isExpired: boolean;
+    }>;
+    batchLogs: Array<{
+      id: string;
+      timestamp: number;
+      totalUsers: number;
+      successCount: number;
+      failureCount: number;
+      algorithm: string;
+      sendNotifications: boolean;
+    }>;
+    total: number;
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.userId) queryParams.append('userId', params.userId);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const response = await apiClient.get(`/recommendations/history?${queryParams.toString()}`);
+    return response.data;
+  }
 }
 
 export default new NotificationService();
