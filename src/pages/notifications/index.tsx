@@ -106,9 +106,11 @@ export default function NotificationsPage() {
       const result = await notificationService.testConnection();
       setConnectionStatus(result.success ? 'connected' : 'disconnected');
       if (!result.success) {
-        toast.error('Không thể kết nối tới backend server!');
+        console.warn('Backend connection failed:', result.message);
+        toast.error(`Lỗi kết nối: ${result.message}`);
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Connection check error:', error);
       setConnectionStatus('disconnected');
       toast.error('Không thể kết nối tới backend server!');
     }
@@ -118,21 +120,32 @@ export default function NotificationsPage() {
     setLoading(true);
     try {
       const [usersData, statsData, healthTipsData] = await Promise.all([
-        notificationService.getUsers(),
-        notificationService.getStats(),
-        notificationService.getHealthTips(),
+        notificationService.getUsers().catch(err => ({ success: false, users: [], error: err.message })),
+        notificationService.getStats().catch(err => ({ success: false, stats: null, error: err.message })),
+        notificationService.getHealthTips().catch(err => ({ success: false, healthTips: [], error: err.message })),
       ]);
 
       if (usersData.success) {
         setUsers(usersData.users);
+      } else {
+        console.warn('Failed to load users:', usersData.error);
       }
 
       if (statsData.success) {
         setStats(statsData.stats);
+      } else {
+        console.warn('Failed to load stats:', statsData.error);
       }
 
       if (healthTipsData.success) {
         setHealthTips(healthTipsData.healthTips);
+      } else {
+        console.warn('Failed to load health tips:', healthTipsData.error);
+      }
+      
+      // Only show error if all requests failed
+      if (!usersData.success && !statsData.success && !healthTipsData.success) {
+        toast.error('Không thể tải dữ liệu. Vui lòng kiểm tra kết nối server.');
       }
     } catch (error: any) {
       console.error('Error loading data:', error);

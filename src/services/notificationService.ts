@@ -197,10 +197,15 @@ class NotificationService {
   // Test connection
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await apiClient.get('/notifications/stats');
-      return { success: true, message: 'Connected to backend server' };
-    } catch (error) {
-      return { success: false, message: 'Cannot connect to backend server' };
+      const response = await apiClient.get('/notifications/stats', { timeout: 5000 });
+      if (response.data && response.data.success) {
+        return { success: true, message: 'Connected to backend server' };
+      }
+      return { success: false, message: 'Invalid response from server' };
+    } catch (error: any) {
+      console.error('Connection test failed:', error);
+      const errorMsg = error.response?.data?.error || error.message || 'Cannot connect to backend server';
+      return { success: false, message: errorMsg };
     }
   }
 

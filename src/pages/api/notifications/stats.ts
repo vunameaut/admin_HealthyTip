@@ -7,7 +7,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    console.log(' Getting statistics...');
+    console.log('📊 Getting statistics...');
+    
+    // Check if Firebase Admin is properly configured
+    if (!process.env.FIREBASE_ADMIN_PROJECT_ID || !process.env.FIREBASE_ADMIN_CLIENT_EMAIL) {
+      console.error('❌ Firebase Admin credentials not configured');
+      return res.status(500).json({
+        success: false,
+        error: 'Firebase Admin not configured. Please check environment variables.'
+      });
+    }
     
     const db = getDatabase();
     
@@ -38,10 +47,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error: any) {
-    console.error(' Error getting stats:', error);
+    console.error('❌ Error getting stats:', error);
+    
+    // Provide more detailed error information
+    const errorMessage = error.code === 'app/invalid-credential' 
+      ? 'Invalid Firebase credentials. Please check your service account configuration.'
+      : error.message || 'Internal server error';
+    
     res.status(500).json({
       success: false,
-      error: error.message
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

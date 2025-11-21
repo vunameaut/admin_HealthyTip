@@ -50,6 +50,7 @@ temp/
 .firebase/
 firebase-debug.log
 firestore-debug.log
+*firebase-adminsdk*.json
 
 # Cloudinary
 cloudinary-config.json
