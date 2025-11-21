@@ -128,19 +128,19 @@ export default function NotificationsPage() {
       if (usersData.success) {
         setUsers(usersData.users);
       } else {
-        console.warn('Failed to load users:', usersData.error);
+        console.warn('Failed to load users:', 'error' in usersData ? usersData.error : 'Unknown error');
       }
 
       if (statsData.success) {
         setStats(statsData.stats);
       } else {
-        console.warn('Failed to load stats:', statsData.error);
+        console.warn('Failed to load stats:', 'error' in statsData ? statsData.error : 'Unknown error');
       }
 
       if (healthTipsData.success) {
         setHealthTips(healthTipsData.healthTips);
       } else {
-        console.warn('Failed to load health tips:', healthTipsData.error);
+        console.warn('Failed to load health tips:', 'error' in healthTipsData ? healthTipsData.error : 'Unknown error');
       }
       
       // Only show error if all requests failed
