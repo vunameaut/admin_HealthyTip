@@ -66,7 +66,12 @@ interface UserStats {
   adminUsers: number;
 }
 
-export default function UserManagement() {
+interface UserManagementProps {
+  darkMode?: boolean;
+  toggleDarkMode?: () => void;
+}
+
+export default function UserManagement({ darkMode, toggleDarkMode }: UserManagementProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({
     totalUsers: 0,
@@ -342,7 +347,7 @@ export default function UserManagement() {
 
   return (
     <AuthGuard>
-      <LayoutWrapper>
+      <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
         <Box p={3}>
           {/* Header */}
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>

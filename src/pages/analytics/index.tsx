@@ -84,7 +84,12 @@ interface AnalyticsData {
   deviceStats: Array<{ device: string; count: number }>;
 }
 
-export default function Analytics() {
+interface AnalyticsProps {
+  darkMode?: boolean;
+  toggleDarkMode?: () => void;
+}
+
+export default function Analytics({ darkMode, toggleDarkMode }: AnalyticsProps) {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     totalEvents: 0,
     uniqueUsers: 0,
@@ -320,7 +325,7 @@ export default function Analytics() {
 
   return (
     <AuthGuard>
-      <LayoutWrapper>
+      <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
         <Box p={3}>
           {/* Header */}
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>

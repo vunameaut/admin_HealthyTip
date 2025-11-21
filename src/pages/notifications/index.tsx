@@ -59,7 +59,12 @@ import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
-export default function NotificationsPage() {
+interface NotificationsPageProps {
+  darkMode?: boolean;
+  toggleDarkMode?: () => void;
+}
+
+export default function NotificationsPage({ darkMode, toggleDarkMode }: NotificationsPageProps) {
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
@@ -280,7 +285,7 @@ export default function NotificationsPage() {
   if (loading) {
     return (
       <AuthGuard>
-        <LayoutWrapper>
+        <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
             <CircularProgress />
           </Box>
@@ -291,7 +296,7 @@ export default function NotificationsPage() {
 
   return (
     <AuthGuard>
-      <LayoutWrapper>
+      <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
         <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
           {/* Header */}
           <Box

@@ -112,7 +112,12 @@ interface SystemConfig {
   };
 }
 
-export default function SystemSettings() {
+interface SystemSettingsProps {
+  darkMode?: boolean;
+  toggleDarkMode?: () => void;
+}
+
+export default function SystemSettings({ darkMode, toggleDarkMode }: SystemSettingsProps) {
   const [config, setConfig] = useState<SystemConfig>({
     firebase: {
       apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
@@ -282,7 +287,7 @@ export default function SystemSettings() {
 
   return (
     <AuthGuard>
-      <LayoutWrapper>
+      <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
         <Box p={3}>
           {/* Header */}
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
