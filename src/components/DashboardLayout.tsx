@@ -50,8 +50,9 @@ import {
   Favorite,
   FitnessCenter,
 } from '@mui/icons-material';
-import { auth } from '@/lib/firebase';
+import { auth, database } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
+import { ref, onValue, query, orderByChild } from 'firebase/database';
 import { User } from '@/types';
 import toast from 'react-hot-toast';
 import Header from './Header';
@@ -74,6 +75,7 @@ export default function DashboardLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({});
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -85,6 +87,29 @@ export default function DashboardLayout({
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
+
+  // Listen for admin notifications
+  useEffect(() => {
+    const notificationsRef = ref(database, 'admin_notifications');
+    const notificationsQuery = query(notificationsRef, orderByChild('read'));
+
+    const unsubscribe = onValue(notificationsQuery, (snapshot) => {
+      if (snapshot.exists()) {
+        let unreadCount = 0;
+        snapshot.forEach((child) => {
+          const notification = child.val();
+          if (!notification.read) {
+            unreadCount++;
+          }
+        });
+        setUnreadNotificationsCount(unreadCount);
+      } else {
+        setUnreadNotificationsCount(0);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleProfileMenuClose = () => {
     setAnchorEl(null);
@@ -110,6 +135,12 @@ export default function DashboardLayout({
       path: '/dashboard',
     },
     {
+      id: 'admin-notifications',
+      title: 'Thông báo Admin',
+      icon: Notifications,
+      path: '/admin-notifications',
+    },
+    {
       id: 'content-management',
       title: 'Quản lý Nội dung',
       icon: Article,
@@ -127,9 +158,9 @@ export default function DashboardLayout({
       path: '/users',
     },
     {
-      id: 'notifications',
+      id: 'push-notifications',
       title: 'Push Notifications',
-      icon: Notifications,
+      icon: Campaign,
       path: '/notifications',
     },
     {
@@ -475,17 +506,18 @@ export default function DashboardLayout({
               label=""
             />
             
-            <IconButton 
+            <IconButton
               color="inherit"
-              sx={{ 
+              onClick={() => router.push('/admin-notifications')}
+              sx={{
                 color: theme.palette.text.primary,
                 '&:hover': {
                   backgroundColor: theme.palette.primary.main + '10',
                 }
               }}
             >
-              <Badge 
-                badgeContent={4} 
+              <Badge
+                badgeContent={unreadNotificationsCount}
                 color="error"
                 sx={{
                   '& .MuiBadge-badge': {
