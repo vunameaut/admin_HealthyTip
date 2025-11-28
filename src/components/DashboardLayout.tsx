@@ -144,7 +144,7 @@ export default function DashboardLayout({
       title: 'Tìm kiếm & SEO',
       icon: Search,
       subItems: [
-        { id: 'search', title: 'Tìm kiếm nội dung', icon: Search, path: '/analytics/search' },
+        { id: 'search', title: 'Tìm kiếm nội dung', icon: Search, path: '/search' },
         { id: 'keywords', title: 'Từ khóa phổ biến', icon: Analytics, path: '/analytics/keywords' },
         { id: 'seo', title: 'SEO Analytics', icon: Analytics, path: '/analytics/seo' },
       ]
@@ -154,6 +154,7 @@ export default function DashboardLayout({
       title: 'Curation & Xuất bản',
       icon: EditCalendar,
       subItems: [
+        { id: 'collections', title: 'Collections', icon: Collection, path: '/collections' },
         { id: 'editorial-calendar', title: 'Lịch biên tập', icon: EditCalendar, path: '/content/calendar' },
         { id: 'approval-workflow', title: 'Quy trình duyệt', icon: Settings, path: '/content/approval' },
         { id: 'featured-content', title: 'Nội dung nổi bật', icon: Article, path: '/content/featured' },
@@ -175,7 +176,7 @@ export default function DashboardLayout({
       title: 'Kiểm duyệt & An toàn',
       icon: Security,
       subItems: [
-        { id: 'moderation', title: 'Content Moderation', icon: Security, path: '/settings/moderation' },
+        { id: 'moderation', title: 'Content Moderation', icon: Security, path: '/moderation' },
         { id: 'data-integrity', title: 'Data Integrity', icon: Security, path: '/settings/integrity' },
         { id: 'safety', title: 'Safety Checks', icon: Security, path: '/settings/safety' },
       ]

@@ -75,7 +75,7 @@ import AuthGuard from '../../components/AuthGuard';
 import VideoPlayer from '../../components/VideoPlayer';
 import { videosService, categoriesService } from '../../services/firebase';
 import { ShortVideo, Category, FilterOptions } from '../../types';
-import { getCloudinaryVideoThumbnail, getCloudinaryVideoUrl } from '../../utils/cloudinary';
+import { getCloudinaryVideoThumbnail, getCloudinaryVideoUrl, uploadVideoToCloudinary } from '../../utils/cloudinary';
 import toast from 'react-hot-toast';
 
 // =================================================================
@@ -369,64 +369,63 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
     try {
       setUploading(true);
       setUploadProgress(0);
-      
-      // NOTE: Upload functionality disabled - uploadVideoToCloudinary not available
-      toast.error('Chức năng upload video hiện chưa khả dụng');
-      
-      // for (let i = 0; i < filesToUpload.length; i++) {
-      //   const file = filesToUpload[i];
-      //   
-      //   try {
-      //     // Upload to Cloudinary
-      //     const uploadResult = await uploadVideoToCloudinary(file, {
-      //       folder: 'health_videos',
-      //       onProgress: (progress: number) => {
-      //         const totalProgress = ((i * 100 + progress) / filesToUpload.length);
-      //         setUploadProgress(totalProgress);
-      //       }
-      //     });
-      //     
-      //     // Create video record in Firebase
-      //     const thumbnailUrl = getCloudinaryVideoThumbnail(uploadResult.public_id);
-      //     
-      //     const newVideo: Omit<ShortVideo, 'id'> = {
-      //       title: newVideoData.title || file.name.replace(/\.[^/.]+$/, ""),
-      //       caption: newVideoData.caption,
-      //       videoUrl: uploadResult.secure_url,
-      //       thumbnailUrl: thumbnailUrl,
-      //       thumb: thumbnailUrl,
-      //       cldPublicId: uploadResult.public_id,
-      //       cldVersion: Date.now(),
-      //       categoryId: newVideoData.categoryId,
-      //       viewCount: 0,
-      //       likeCount: 0,
-      //       userId: 'admin',
-      //       status: newVideoData.status as 'draft' | 'published',
-      //       uploadDate: Date.now(),
-      //       updatedAt: Date.now(),
-      //       duration: uploadResult.duration || 0,
-      //       width: uploadResult.width || 0,
-      //       height: uploadResult.height || 0,
-      //       tags: newVideoData.tags.split(',').reduce((acc: Record<string, boolean>, tag) => {
-      //         const trimmedTag = tag.trim();
-      //         if (trimmedTag) {
-      //           acc[trimmedTag] = true;
-      //         }
-      //         return acc;
-      //       }, {}),
-      //     };
-      //     
-      //     await videosService.create(newVideo);
-      //     
-      //   } catch (uploadError) {
-      //     console.error(`Error uploading ${file.name}:`, uploadError);
-      //     toast.error(`Lỗi tải lên ${file.name}`);
-      //   }
-      // }
-      
-      // toast.success(`Đã tải lên ${filesToUpload.length} video thành công`);
+
+      const categoryName = categories.find(c => c.id === newVideoData.categoryId)?.name || 'videos';
+
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+
+        try {
+          // Upload to Cloudinary
+          const uploadResult = await uploadVideoToCloudinary(file, {
+            category: categoryName,
+            onProgress: (progress: number) => {
+              const totalProgress = ((i * 100 + progress) / filesToUpload.length);
+              setUploadProgress(totalProgress);
+            }
+          });
+
+          // Create video record in Firebase
+          const thumbnailUrl = uploadResult.thumbnail_url || '';
+
+          const newVideo: Omit<ShortVideo, 'id'> = {
+            title: newVideoData.title || file.name.replace(/\.[^/.]+$/, ""),
+            caption: newVideoData.caption,
+            videoUrl: uploadResult.secure_url,
+            thumbnailUrl: thumbnailUrl,
+            thumb: thumbnailUrl,
+            cldPublicId: uploadResult.public_id,
+            cldVersion: Date.now(),
+            categoryId: newVideoData.categoryId,
+            viewCount: 0,
+            likeCount: 0,
+            userId: 'admin',
+            status: newVideoData.status as 'draft' | 'published',
+            uploadDate: Date.now(),
+            updatedAt: Date.now(),
+            duration: uploadResult.duration || 0,
+            width: uploadResult.width || 0,
+            height: uploadResult.height || 0,
+            tags: newVideoData.tags.split(',').reduce((acc: Record<string, boolean>, tag) => {
+              const trimmedTag = tag.trim();
+              if (trimmedTag) {
+                acc[trimmedTag] = true;
+              }
+              return acc;
+            }, {}),
+          };
+
+          await videosService.create(newVideo);
+
+        } catch (uploadError) {
+          console.error(`Error uploading ${file.name}:`, uploadError);
+          toast.error(`Lỗi tải lên ${file.name}`);
+        }
+      }
+
+      toast.success(`Đã tải lên ${filesToUpload.length} video thành công`);
       handleCloseUploadDialog();
-      // loadData();
+      loadData();
     } catch (error) {
       console.error('Error uploading videos:', error);
       toast.error('Có lỗi xảy ra khi tải lên video');

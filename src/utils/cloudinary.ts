@@ -157,6 +157,236 @@ export const extractPublicId = (cloudinaryUrl: string): string => {
 export const getCloudinaryVideoThumbnail = (videoUrl: string, options: CloudinaryTransformOptions = {}): string => {
   const publicId = extractPublicId(videoUrl);
   if (!publicId) return '';
-  
+
   return generateVideoThumbnail(publicId, options);
+};
+
+/**
+ * Upload options for videos and images
+ */
+export interface UploadOptions {
+  folder?: string;
+  category?: string;
+  onProgress?: (progress: number) => void;
+  resourceType?: 'image' | 'video';
+}
+
+/**
+ * Upload result from Cloudinary
+ */
+export interface UploadResult {
+  public_id: string;
+  secure_url: string;
+  url: string;
+  resource_type: string;
+  format: string;
+  width: number;
+  height: number;
+  duration?: number;
+  thumbnail_url?: string;
+  folder?: string;
+  created_at: string;
+}
+
+/**
+ * Upload video to Cloudinary with progress tracking
+ */
+export const uploadVideoToCloudinary = async (
+  file: File,
+  options: UploadOptions = {}
+): Promise<UploadResult> => {
+  try {
+    // Validate file
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    if (!file.type.startsWith('video/')) {
+      throw new Error('File phải là video');
+    }
+
+    // Get upload config
+    const configResponse = await fetch('/api/cloudinary/signature', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: options.category || 'videos',
+        resourceType: 'video'
+      }),
+    });
+
+    if (!configResponse.ok) {
+      throw new Error('Failed to get upload config');
+    }
+
+    const { upload_preset, cloud_name, folder, upload_url } = await configResponse.json();
+
+    // Prepare form data for unsigned upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', upload_preset);
+    formData.append('folder', options.folder || folder);
+
+    // Upload to Cloudinary using XMLHttpRequest for progress tracking
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && options.onProgress) {
+          const progress = (e.loaded / e.total) * 100;
+          options.onProgress(progress);
+        }
+      });
+
+      // Handle successful upload
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+
+            // Generate thumbnail URL for video
+            const thumbnailUrl = generateVideoThumbnail(result.public_id, {
+              width: 400,
+              height: 300,
+              quality: 'auto'
+            });
+
+            resolve({
+              public_id: result.public_id,
+              secure_url: result.secure_url,
+              url: result.url,
+              resource_type: result.resource_type,
+              format: result.format,
+              width: result.width,
+              height: result.height,
+              duration: result.duration,
+              thumbnail_url: thumbnailUrl,
+              folder: result.folder,
+              created_at: result.created_at
+            });
+          } catch (error) {
+            reject(new Error('Failed to parse upload response'));
+          }
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      // Handle upload error
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+
+      // Handle upload abort
+      xhr.addEventListener('abort', () => {
+        reject(new Error('Upload cancelled'));
+      });
+
+      // Send request
+      xhr.open('POST', upload_url);
+      xhr.send(formData);
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Upload image to Cloudinary with progress tracking
+ */
+export const uploadImageToCloudinary = async (
+  file: File,
+  options: UploadOptions = {}
+): Promise<UploadResult> => {
+  try {
+    // Validate file
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    if (!file.type.startsWith('image/')) {
+      throw new Error('File phải là hình ảnh');
+    }
+
+    // Get upload config
+    const configResponse = await fetch('/api/cloudinary/signature', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: options.category || 'images',
+        resourceType: 'image'
+      }),
+    });
+
+    if (!configResponse.ok) {
+      throw new Error('Failed to get upload config');
+    }
+
+    const { upload_preset, cloud_name, folder, upload_url } = await configResponse.json();
+
+    // Prepare form data for unsigned upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', upload_preset);
+    formData.append('folder', options.folder || folder);
+
+    // Upload to Cloudinary using XMLHttpRequest for progress tracking
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && options.onProgress) {
+          const progress = (e.loaded / e.total) * 100;
+          options.onProgress(progress);
+        }
+      });
+
+      // Handle successful upload
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+
+            resolve({
+              public_id: result.public_id,
+              secure_url: result.secure_url,
+              url: result.url,
+              resource_type: result.resource_type,
+              format: result.format,
+              width: result.width,
+              height: result.height,
+              folder: result.folder,
+              created_at: result.created_at
+            });
+          } catch (error) {
+            reject(new Error('Failed to parse upload response'));
+          }
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      // Handle upload error
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+
+      // Handle upload abort
+      xhr.addEventListener('abort', () => {
+        reject(new Error('Upload cancelled'));
+      });
+
+      // Send request
+      xhr.open('POST', upload_url);
+      xhr.send(formData);
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    throw error;
+  }
 };

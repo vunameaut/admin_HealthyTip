@@ -1,6 +1,14 @@
-import { ref, push, set, get, update, remove, query, orderByChild, orderByKey, limitToLast, limitToFirst, startAt, endAt, onValue, off } from 'firebase/database';
+import { ref, push, set, get, update, remove, query, orderByChild, orderByKey, limitToLast, limitToFirst, startAt, endAt, onValue, off, startAfter, DataSnapshot } from 'firebase/database';
 import { database } from '../lib/firebase';
 import { HealthTip, Category, FirebaseAnalytics, User, ShortVideo, Reminder, FilterOptions, ApiResponse, Media } from '../types';
+
+// Pagination result interface
+export interface PaginatedResult<T> {
+  data: T[];
+  nextCursor?: string;
+  hasMore: boolean;
+  total?: number;
+}
 
 // Health Tips Service
 export class HealthTipsService {
@@ -102,6 +110,73 @@ export class HealthTipsService {
     }
   }
 
+  /**
+   * Get paginated health tips
+   * @param pageSize Number of items per page
+   * @param cursor Last item key from previous page (for next page)
+   * @param orderBy Field to order by (default: 'createdAt')
+   */
+  async getPaginated(
+    pageSize: number = 25,
+    cursor?: string,
+    orderBy: string = 'createdAt'
+  ): Promise<PaginatedResult<HealthTip>> {
+    try {
+      const tipsRef = ref(database, this.basePath);
+
+      // Build query with pagination
+      let tipsQuery;
+      if (cursor) {
+        // Get next page starting after cursor
+        tipsQuery = query(
+          tipsRef,
+          orderByChild(orderBy),
+          startAfter(cursor),
+          limitToFirst(pageSize + 1) // Get one extra to check if there's more
+        );
+      } else {
+        // Get first page
+        tipsQuery = query(
+          tipsRef,
+          orderByChild(orderBy),
+          limitToFirst(pageSize + 1)
+        );
+      }
+
+      const snapshot = await get(tipsQuery);
+
+      if (!snapshot.exists()) {
+        return { data: [], hasMore: false };
+      }
+
+      const tips: HealthTip[] = [];
+      snapshot.forEach((child) => {
+        tips.push({
+          id: child.key!,
+          ...child.val()
+        });
+      });
+
+      // Check if there are more items
+      const hasMore = tips.length > pageSize;
+      if (hasMore) {
+        tips.pop(); // Remove the extra item
+      }
+
+      // Get the cursor for next page (last item's key)
+      const nextCursor = tips.length > 0 ? tips[tips.length - 1].id : undefined;
+
+      return {
+        data: tips,
+        nextCursor: hasMore ? nextCursor : undefined,
+        hasMore
+      };
+    } catch (error) {
+      console.error('Error fetching paginated health tips:', error);
+      throw error;
+    }
+  }
+
   private applyFilters(tips: HealthTip[], filters?: FilterOptions): HealthTip[] {
     if (!filters) return tips;
 
@@ -115,7 +190,7 @@ export class HealthTipsService {
       }
       if (filters.dateFrom && tip.createdAt < new Date(filters.dateFrom).getTime()) return false;
       if (filters.dateTo && tip.createdAt > new Date(filters.dateTo).getTime()) return false;
-      
+
       return true;
     });
   }
@@ -287,6 +362,73 @@ export class VideosService {
       await update(commentRef, updates);
     } catch (error) {
       console.error('Error updating comment:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get paginated videos
+   * @param pageSize Number of items per page
+   * @param cursor Last item key from previous page (for next page)
+   * @param orderBy Field to order by (default: 'uploadDate')
+   */
+  async getPaginated(
+    pageSize: number = 25,
+    cursor?: string,
+    orderBy: string = 'uploadDate'
+  ): Promise<PaginatedResult<ShortVideo>> {
+    try {
+      const videosRef = ref(database, this.basePath);
+
+      // Build query with pagination
+      let videosQuery;
+      if (cursor) {
+        // Get next page starting after cursor
+        videosQuery = query(
+          videosRef,
+          orderByChild(orderBy),
+          startAfter(cursor),
+          limitToFirst(pageSize + 1) // Get one extra to check if there's more
+        );
+      } else {
+        // Get first page
+        videosQuery = query(
+          videosRef,
+          orderByChild(orderBy),
+          limitToFirst(pageSize + 1)
+        );
+      }
+
+      const snapshot = await get(videosQuery);
+
+      if (!snapshot.exists()) {
+        return { data: [], hasMore: false };
+      }
+
+      const videos: ShortVideo[] = [];
+      snapshot.forEach((child) => {
+        videos.push({
+          id: child.key!,
+          ...child.val()
+        });
+      });
+
+      // Check if there are more items
+      const hasMore = videos.length > pageSize;
+      if (hasMore) {
+        videos.pop(); // Remove the extra item
+      }
+
+      // Get the cursor for next page (last item's key)
+      const nextCursor = videos.length > 0 ? videos[videos.length - 1].id : undefined;
+
+      return {
+        data: videos,
+        nextCursor: hasMore ? nextCursor : undefined,
+        hasMore
+      };
+    } catch (error) {
+      console.error('Error fetching paginated videos:', error);
       throw error;
     }
   }

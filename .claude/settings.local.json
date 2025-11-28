@@ -11,7 +11,15 @@
       "Bash(set PORT=3001)",
       "Bash(nul)",
       "Bash(npm run build:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(vercel env rm:*)",
+      "Bash(vercel env add:*)",
+      "Bash(node:*)",
+      "Bash(vercel env:*)",
+      "Bash(vercel --prod)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
