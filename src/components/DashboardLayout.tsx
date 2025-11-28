@@ -117,91 +117,44 @@ export default function DashboardLayout({
         { id: 'health-tips', title: 'Bài viết (Health Tips)', icon: Article, path: '/content' },
         { id: 'videos', title: 'Video ngắn', icon: VideoLibrary, path: '/videos' },
         { id: 'categories', title: 'Danh mục & Tags', icon: Category, path: '/content/categories' },
-      ]
-    },
-    {
-      id: 'media-pipeline',
-      title: 'Media Pipeline',
-      icon: VideoLibrary,
-      subItems: [
-        { id: 'upload', title: 'Upload Manager', icon: Campaign, path: '/videos/upload' },
-        { id: 'cloudinary', title: 'Cloudinary Settings', icon: Settings, path: '/settings/cloudinary' },
-        { id: 'media', title: 'Media Library', icon: Collection, path: '/videos/media' },
+        { id: 'collections', title: 'Collections', icon: Collection, path: '/collections' },
       ]
     },
     {
       id: 'users',
-      title: 'Người dùng',
+      title: 'Quản lý Người dùng',
       icon: People,
-      subItems: [
-        { id: 'user-management', title: 'Quản lý Users', icon: People, path: '/users' },
-        { id: 'roles', title: 'Phân quyền', icon: Security, path: '/users/roles' },
-        { id: 'user-activities', title: 'Hoạt động Users', icon: Analytics, path: '/users/activities' },
-      ]
+      path: '/users',
     },
     {
-      id: 'search-seo',
-      title: 'Tìm kiếm & SEO',
+      id: 'notifications',
+      title: 'Push Notifications',
+      icon: Notifications,
+      path: '/notifications',
+    },
+    {
+      id: 'search',
+      title: 'Tìm kiếm nội dung',
       icon: Search,
-      subItems: [
-        { id: 'search', title: 'Tìm kiếm nội dung', icon: Search, path: '/search' },
-        { id: 'keywords', title: 'Từ khóa phổ biến', icon: Analytics, path: '/analytics/keywords' },
-        { id: 'seo', title: 'SEO Analytics', icon: Analytics, path: '/analytics/seo' },
-      ]
-    },
-    {
-      id: 'curation',
-      title: 'Curation & Xuất bản',
-      icon: EditCalendar,
-      subItems: [
-        { id: 'collections', title: 'Collections', icon: Collection, path: '/collections' },
-        { id: 'editorial-calendar', title: 'Lịch biên tập', icon: EditCalendar, path: '/content/calendar' },
-        { id: 'approval-workflow', title: 'Quy trình duyệt', icon: Settings, path: '/content/approval' },
-        { id: 'featured-content', title: 'Nội dung nổi bật', icon: Article, path: '/content/featured' },
-      ]
+      path: '/search',
     },
     {
       id: 'analytics',
-      title: 'Báo cáo & Phân tích',
+      title: 'Analytics & Reports',
       icon: Analytics,
-      subItems: [
-        { id: 'dashboard-analytics', title: 'Dashboard Analytics', icon: Analytics, path: '/analytics' },
-        { id: 'kpi', title: 'KPI Reports', icon: Analytics, path: '/analytics/kpi' },
-        { id: 'user-behavior', title: 'User Behavior', icon: Analytics, path: '/analytics/behavior' },
-        { id: 'content-performance', title: 'Content Performance', icon: Analytics, path: '/analytics/performance' },
-      ]
+      path: '/analytics',
     },
     {
-      id: 'security',
-      title: 'Kiểm duyệt & An toàn',
+      id: 'moderation',
+      title: 'Content Moderation',
       icon: Security,
-      subItems: [
-        { id: 'moderation', title: 'Content Moderation', icon: Security, path: '/moderation' },
-        { id: 'data-integrity', title: 'Data Integrity', icon: Security, path: '/settings/integrity' },
-        { id: 'safety', title: 'Safety Checks', icon: Security, path: '/settings/safety' },
-      ]
+      path: '/moderation',
     },
     {
-      id: 'campaigns',
-      title: 'Thông báo & Chiến dịch',
-      icon: Campaign,
-      subItems: [
-        { id: 'notifications', title: 'Push Notifications', icon: Notifications, path: '/notifications' },
-        { id: 'email-campaigns', title: 'Email Campaigns', icon: Campaign, path: '/settings/campaigns' },
-        { id: 'segmentation', title: 'User Segmentation', icon: People, path: '/users/segmentation' },
-        { id: 'campaign-analytics', title: 'Campaign Analytics', icon: Analytics, path: '/analytics/campaigns' },
-      ]
-    },
-    {
-      id: 'system-settings',
-      title: 'Cài đặt Hệ thống',
+      id: 'settings',
+      title: 'Cài đặt',
       icon: Settings,
-      subItems: [
-        { id: 'firebase-config', title: 'Firebase Config', icon: Settings, path: '/settings' },
-        { id: 'feature-flags', title: 'Feature Flags', icon: Settings, path: '/settings/features' },
-        { id: 'audit-logs', title: 'Audit Logs', icon: Analytics, path: '/settings/logs' },
-        { id: 'system-settings', title: 'System Settings', icon: Settings, path: '/settings/system' },
-      ]
+      path: '/settings',
     },
   ];
 
