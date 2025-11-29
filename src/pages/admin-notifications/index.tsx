@@ -190,30 +190,48 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
     }
 
     try {
+      // Extract userId from various possible locations in the notification data
+      const userId = selectedNotification.data?.userId ||
+                     selectedNotification.data?.createdBy ||
+                     selectedNotification.createdBy;
+
+      if (!userId) {
+        console.error('Cannot find userId in notification:', selectedNotification);
+        toast.error('Không tìm thấy thông tin người dùng trong thông báo');
+        return;
+      }
+
       const response = await fetch('/api/admin-notifications/send-response', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: selectedNotification.data?.userId || selectedNotification.createdBy,
+          userId,
           notificationId: selectedNotification.id,
           responseMessage,
           adminName: 'Admin', // You can get this from auth context
         }),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        throw `Failed to send response: ${response.status}`;
+        console.error('API Error:', responseData);
+        const errorMsg = String(responseData.error || responseData.message || `HTTP ${response.status}`);
+        throw { message: errorMsg };
       }
 
       toast.success('Đã gửi phản hồi đến người dùng');
       setResponseDialogOpen(false);
       setResponseMessage('');
       setDetailsOpen(false);
-    } catch (error) {
+
+      // Mark notification as resolved
+      await handleMarkAsResolved(selectedNotification.id);
+    } catch (error: any) {
       console.error('Error sending response:', error);
-      toast.error('Không thể gửi phản hồi');
+      toast.error(`Không thể gửi phản hồi: ${error.message || 'Lỗi không xác định'}`);
     }
   };
 
@@ -612,6 +630,26 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
               <Button onClick={() => setDetailsOpen(false)}>
                 Đóng
               </Button>
+              {selectedNotification && selectedNotification.type === 'USER_REPORT' && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => {
+                    const userId = selectedNotification.data?.userId || selectedNotification.createdBy;
+                    const ticketId = selectedNotification.data?.ticketId;
+
+                    // Navigate with query params to auto-open the ticket
+                    if (userId) {
+                      router.push(`/support?userId=${userId}${ticketId ? `&ticketId=${ticketId}` : ''}`);
+                    } else {
+                      router.push('/support');
+                    }
+                    setDetailsOpen(false);
+                  }}
+                >
+                  Xem chi tiết ticket
+                </Button>
+              )}
               {selectedNotification && selectedNotification.actionUrl && (
                 <Button
                   variant="outlined"
@@ -620,18 +658,9 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
                   Xem chi tiết
                 </Button>
               )}
-              {selectedNotification && selectedNotification.type === 'USER_REPORT' && !selectedNotification.resolved && (
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => setResponseDialogOpen(true)}
-                >
-                  Gửi phản hồi
-                </Button>
-              )}
               {selectedNotification && !selectedNotification.resolved && (
                 <Button
-                  variant="contained"
+                  variant="outlined"
                   color="success"
                   onClick={() => handleMarkAsResolved(selectedNotification.id)}
                 >

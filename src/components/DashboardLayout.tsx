@@ -49,6 +49,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   Favorite,
   FitnessCenter,
+  Support,
 } from '@mui/icons-material';
 import { auth, database } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -139,6 +140,12 @@ export default function DashboardLayout({
       title: 'Thông báo Admin',
       icon: Notifications,
       path: '/admin-notifications',
+    },
+    {
+      id: 'support',
+      title: 'Quản lý Hỗ trợ',
+      icon: Support,
+      path: '/support',
     },
     {
       id: 'content-management',

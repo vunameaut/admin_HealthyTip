@@ -4,14 +4,25 @@ import admin from 'firebase-admin';
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
   try {
+    const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    const databaseURL = process.env.FIREBASE_ADMIN_DATABASE_URL;
+
+    if (!projectId || !clientEmail || !privateKey || !databaseURL) {
+      console.error('Missing Firebase Admin environment variables');
+      console.error('Required: FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, FIREBASE_ADMIN_PRIVATE_KEY, FIREBASE_ADMIN_DATABASE_URL');
+    }
+
     admin.initializeApp({
       credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        projectId,
+        clientEmail,
+        privateKey,
       }),
-      databaseURL: process.env.FIREBASE_ADMIN_DATABASE_URL,
+      databaseURL,
     });
+    console.log('Firebase Admin initialized successfully');
   } catch (error) {
     console.error('Firebase admin initialization error', error);
   }
@@ -25,6 +36,15 @@ export default async function handler(
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Check if Firebase Admin is initialized
+  if (!admin.apps.length) {
+    console.error('Firebase Admin not initialized');
+    return res.status(500).json({
+      error: 'Firebase Admin SDK not initialized',
+      message: 'Server configuration error. Please check Firebase Admin credentials.'
+    });
   }
 
   try {
@@ -126,9 +146,12 @@ export default async function handler(
 
   } catch (error: any) {
     console.error('Error sending response to user:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Request body:', req.body);
     return res.status(500).json({
       error: 'Internal server error',
-      message: error.message
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

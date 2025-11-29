@@ -45,6 +45,7 @@ import { supportService } from '../../services/firebase';
 import { SupportTicket, SupportMessage } from '../../types';
 import toast from 'react-hot-toast';
 import { auth } from '../../lib/firebase';
+import { useRouter } from 'next/router';
 
 interface SupportStats {
   total: number;
@@ -59,6 +60,7 @@ interface SupportManagementProps {
 }
 
 export default function SupportManagement({ darkMode, toggleDarkMode }: SupportManagementProps) {
+  const router = useRouter();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [stats, setStats] = useState<SupportStats>({
     total: 0,
@@ -80,6 +82,32 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
   useEffect(() => {
     loadData();
   }, []);
+
+  // Auto-open ticket from notification
+  useEffect(() => {
+    if (router.query.userId && tickets.length > 0) {
+      const userId = router.query.userId as string;
+      const ticketId = router.query.ticketId as string;
+
+      // Find ticket by ticketId first, or by userId
+      let ticket: SupportTicket | undefined;
+
+      if (ticketId) {
+        ticket = tickets.find(t => t.id === ticketId);
+      } else {
+        // Find the most recent ticket from this user
+        ticket = tickets
+          .filter(t => t.userId === userId)
+          .sort((a, b) => b.timestamp - a.timestamp)[0];
+      }
+
+      if (ticket) {
+        handleOpenChat(ticket);
+        // Clear query params after opening
+        router.replace('/support', undefined, { shallow: true });
+      }
+    }
+  }, [router.query, tickets]);
 
   useEffect(() => {
     if (chatOpen && selectedTicket) {
@@ -156,6 +184,27 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
       };
 
       await supportService.sendMessage(selectedTicket.id, message);
+
+      // Send notification to user
+      try {
+        await fetch('/api/support/send-message-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ticketId: selectedTicket.id,
+            userId: selectedTicket.userId,
+            senderType: 'admin',
+            message: messageText,
+            senderName: currentUser.email || 'Admin'
+          }),
+        });
+      } catch (notifError) {
+        console.error('Error sending notification:', notifError);
+        // Don't fail the message send if notification fails
+      }
+
       setMessageText('');
       await loadMessages();
       await loadData(); // Refresh ticket list
@@ -475,7 +524,13 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
             maxWidth="md"
             fullWidth
             PaperProps={{
-              sx: { height: '80vh', display: 'flex', flexDirection: 'column' }
+              sx: {
+                height: '85vh',
+                maxHeight: '85vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }
             }}
           >
             {selectedTicket && (
@@ -498,129 +553,162 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
 
                 <Divider />
 
-                {/* Ticket Info */}
-                <Box p={2} bgcolor="background.default">
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <Typography variant="body2" color="text.secondary">
-                        Mô tả vấn đề:
-                      </Typography>
-                      <Typography variant="body1">
-                        {selectedTicket.description}
-                      </Typography>
-                    </Grid>
-                    {selectedTicket.imageUrl && (
+                {/* Ticket Info + Messages - Combined scrollable area */}
+                <DialogContent sx={{ flex: 1, overflow: 'auto', p: 0 }}>
+                  {/* Ticket Info */}
+                  <Box p={2} bgcolor="background.default">
+                    <Grid container spacing={2}>
                       <Grid item xs={12}>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Ảnh đính kèm:
-                        </Typography>
-                        <img
-                          src={selectedTicket.imageUrl}
-                          alt="Issue"
-                          style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8 }}
-                        />
-                      </Grid>
-                    )}
-                    <Grid item xs={12}>
-                      <Box display="flex" gap={1} alignItems="center">
                         <Typography variant="body2" color="text.secondary">
-                          Trạng thái:
+                          Mô tả vấn đề:
                         </Typography>
-                        <Chip
-                          label={getStatusLabel(selectedTicket.status)}
-                          size="small"
-                          color={getStatusColor(selectedTicket.status) as any}
-                        />
-                        <FormControl size="small" sx={{ minWidth: 150, ml: 2 }}>
-                          <Select
-                            value={selectedTicket.status}
-                            onChange={(e) => handleUpdateStatus(selectedTicket.id, e.target.value as any)}
-                          >
-                            <MenuItem value="pending">Đang chờ</MenuItem>
-                            <MenuItem value="in_progress">Đang xử lý</MenuItem>
-                            <MenuItem value="resolved">Đã giải quyết</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Box>
+                        <Typography variant="body1">
+                          {selectedTicket.description}
+                        </Typography>
+                      </Grid>
+                      {selectedTicket.imageUrl && (
+                        <Grid item xs={12}>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            Ảnh đính kèm:
+                          </Typography>
+                          <Box
+                            component="img"
+                            src={selectedTicket.imageUrl}
+                            alt="Issue"
+                            sx={{
+                              maxWidth: '300px',
+                              maxHeight: '200px',
+                              width: 'auto',
+                              height: 'auto',
+                              objectFit: 'contain',
+                              borderRadius: 1,
+                              cursor: 'pointer',
+                              border: '1px solid',
+                              borderColor: 'divider'
+                            }}
+                            onClick={() => window.open(selectedTicket.imageUrl, '_blank')}
+                          />
+                        </Grid>
+                      )}
+                      <Grid item xs={12}>
+                        <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
+                          <Typography variant="body2" color="text.secondary">
+                            Trạng thái:
+                          </Typography>
+                          <Chip
+                            label={getStatusLabel(selectedTicket.status)}
+                            size="small"
+                            color={getStatusColor(selectedTicket.status) as any}
+                          />
+                          <FormControl size="small" sx={{ minWidth: 150 }}>
+                            <Select
+                              value={selectedTicket.status}
+                              onChange={(e) => handleUpdateStatus(selectedTicket.id, e.target.value as any)}
+                            >
+                              <MenuItem value="pending">Đang chờ</MenuItem>
+                              <MenuItem value="in_progress">Đang xử lý</MenuItem>
+                              <MenuItem value="resolved">Đã giải quyết</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Box>
+                      </Grid>
                     </Grid>
-                  </Grid>
-                </Box>
+                  </Box>
 
-                <Divider />
+                  <Divider />
 
-                {/* Messages */}
-                <DialogContent sx={{ flex: 1, overflow: 'auto' }}>
-                  <List>
-                    {messages.map((message, index) => (
-                      <ListItem
-                        key={message.id || index}
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: message.senderType === 'admin' ? 'flex-end' : 'flex-start',
-                          mb: 2
-                        }}
-                      >
-                        <Paper
-                          elevation={1}
+                  {/* Messages */}
+                  <Box sx={{ p: 2 }}>
+                    <List sx={{ py: 0 }}>
+                      {messages.map((message, index) => (
+                        <ListItem
+                          key={message.id || index}
                           sx={{
-                            p: 2,
-                            maxWidth: '70%',
-                            bgcolor: message.senderType === 'admin' ? 'primary.main' : 'background.paper',
-                            color: message.senderType === 'admin' ? 'white' : 'text.primary'
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: message.senderType === 'admin' ? 'flex-end' : 'flex-start',
+                            mb: 2,
+                            px: 0
                           }}
                         >
-                          <Typography variant="caption" display="block" sx={{ opacity: 0.8 }}>
-                            {message.senderName} • {new Date(message.timestamp).toLocaleString('vi-VN')}
-                          </Typography>
-                          <Typography variant="body1" mt={1}>
-                            {message.text}
-                          </Typography>
-                          {message.imageUrl && (
-                            <Box mt={1}>
-                              <img
-                                src={message.imageUrl}
-                                alt="Message attachment"
-                                style={{ maxWidth: '100%', borderRadius: 4 }}
-                              />
-                            </Box>
-                          )}
-                        </Paper>
-                      </ListItem>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </List>
+                          <Paper
+                            elevation={1}
+                            sx={{
+                              p: 1.5,
+                              maxWidth: '70%',
+                              bgcolor: message.senderType === 'admin' ? 'primary.main' : 'background.paper',
+                              color: message.senderType === 'admin' ? 'white' : 'text.primary'
+                            }}
+                          >
+                            <Typography variant="caption" display="block" sx={{ opacity: 0.8, mb: 0.5 }}>
+                              {message.senderName} • {new Date(message.timestamp).toLocaleString('vi-VN')}
+                            </Typography>
+                            {message.text && (
+                              <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+                                {message.text}
+                              </Typography>
+                            )}
+                            {message.imageUrl && (
+                              <Box mt={1}>
+                                <Box
+                                  component="img"
+                                  src={message.imageUrl}
+                                  alt="Message attachment"
+                                  sx={{
+                                    maxWidth: '200px',
+                                    maxHeight: '150px',
+                                    width: 'auto',
+                                    height: 'auto',
+                                    objectFit: 'contain',
+                                    borderRadius: 1,
+                                    cursor: 'pointer',
+                                    border: '1px solid',
+                                    borderColor: message.senderType === 'admin' ? 'rgba(255,255,255,0.3)' : 'divider'
+                                  }}
+                                  onClick={() => window.open(message.imageUrl, '_blank')}
+                                />
+                              </Box>
+                            )}
+                          </Paper>
+                        </ListItem>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </List>
+                  </Box>
                 </DialogContent>
 
                 <Divider />
 
-                {/* Message Input */}
-                <DialogActions sx={{ p: 2 }}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    maxRows={3}
-                    placeholder="Nhập tin nhắn..."
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    disabled={sendingMessage}
-                  />
-                  <Button
-                    variant="contained"
-                    startIcon={<Send />}
-                    onClick={handleSendMessage}
-                    disabled={!messageText.trim() || sendingMessage}
-                    sx={{ ml: 1 }}
-                  >
-                    Gửi
-                  </Button>
-                </DialogActions>
+                {/* Message Input - Fixed at bottom */}
+                <Box sx={{ p: 2, bgcolor: 'background.paper' }}>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      maxRows={3}
+                      size="small"
+                      placeholder="Nhập tin nhắn..."
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                      disabled={sendingMessage}
+                    />
+                    <Button
+                      variant="contained"
+                      size="medium"
+                      onClick={handleSendMessage}
+                      disabled={!messageText.trim() || sendingMessage}
+                      sx={{ minWidth: '80px', height: '40px' }}
+                    >
+                      <Send fontSize="small" />
+                    </Button>
+                  </Box>
+                </Box>
               </>
             )}
           </Dialog>
