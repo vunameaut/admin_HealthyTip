@@ -85,6 +85,8 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [responseDialogOpen, setResponseDialogOpen] = useState(false);
+  const [responseMessage, setResponseMessage] = useState('');
 
   useEffect(() => {
     loadNotifications();
@@ -178,6 +180,40 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
   const handleActionClick = (notification: AdminNotification) => {
     if (notification.actionUrl) {
       router.push(notification.actionUrl);
+    }
+  };
+
+  const handleSendResponse = async () => {
+    if (!selectedNotification || !responseMessage.trim()) {
+      toast.error('Vui lòng nhập nội dung phản hồi');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin-notifications/send-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: selectedNotification.data?.userId || selectedNotification.createdBy,
+          notificationId: selectedNotification.id,
+          responseMessage,
+          adminName: 'Admin', // You can get this from auth context
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send response');
+      }
+
+      toast.success('Đã gửi phản hồi đến người dùng');
+      setResponseDialogOpen(false);
+      setResponseMessage('');
+      setDetailsOpen(false);
+    } catch (error) {
+      console.error('Error sending response:', error);
+      toast.error('Không thể gửi phản hồi');
     }
   };
 
@@ -584,6 +620,15 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
                   Xem chi tiết
                 </Button>
               )}
+              {selectedNotification && selectedNotification.type === 'USER_REPORT' && !selectedNotification.resolved && (
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => setResponseDialogOpen(true)}
+                >
+                  Gửi phản hồi
+                </Button>
+              )}
               {selectedNotification && !selectedNotification.resolved && (
                 <Button
                   variant="contained"
@@ -593,6 +638,46 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
                   Đánh dấu đã xử lý
                 </Button>
               )}
+            </DialogActions>
+          </Dialog>
+
+          {/* Response Dialog */}
+          <Dialog open={responseDialogOpen} onClose={() => setResponseDialogOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle>
+              Gửi phản hồi đến người dùng
+            </DialogTitle>
+            <DialogContent>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Nội dung phản hồi"
+                type="text"
+                fullWidth
+                multiline
+                rows={4}
+                variant="outlined"
+                value={responseMessage}
+                onChange={(e) => setResponseMessage(e.target.value)}
+                placeholder="Nhập nội dung phản hồi cho người dùng..."
+              />
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Người dùng sẽ nhận được thông báo này trong ứng dụng
+              </Alert>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => {
+                setResponseDialogOpen(false);
+                setResponseMessage('');
+              }}>
+                Hủy
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSendResponse}
+                disabled={!responseMessage.trim()}
+              >
+                Gửi phản hồi
+              </Button>
             </DialogActions>
           </Dialog>
         </Box>
