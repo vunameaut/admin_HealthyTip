@@ -1,6 +1,6 @@
 import { ref, push, set, get, update, remove, query, orderByChild, orderByKey, limitToLast, limitToFirst, startAt, endAt, onValue, off, startAfter, DataSnapshot } from 'firebase/database';
 import { database } from '../lib/firebase';
-import { HealthTip, Category, FirebaseAnalytics, User, ShortVideo, Reminder, FilterOptions, ApiResponse, Media } from '../types';
+import { HealthTip, Category, FirebaseAnalytics, User, ShortVideo, Reminder, FilterOptions, ApiResponse, Media, SupportTicket, SupportMessage } from '../types';
 
 // Pagination result interface
 export interface PaginatedResult<T> {
@@ -642,6 +642,149 @@ export class RemindersService {
   }
 }
 
+// Support Tickets Service
+export class SupportService {
+  private basePath = 'issues';
+
+  async getAll(filters?: { status?: string; issueType?: string }): Promise<SupportTicket[]> {
+    try {
+      const issuesRef = ref(database, this.basePath);
+      const snapshot = await get(issuesRef);
+
+      if (!snapshot.exists()) return [];
+
+      const tickets: SupportTicket[] = [];
+      snapshot.forEach((child) => {
+        const ticket = child.val();
+        tickets.push({
+          id: child.key!,
+          ...ticket
+        });
+      });
+
+      // Apply filters
+      let filteredTickets = tickets;
+      if (filters?.status) {
+        filteredTickets = filteredTickets.filter(t => t.status === filters.status);
+      }
+      if (filters?.issueType) {
+        filteredTickets = filteredTickets.filter(t => t.issueType === filters.issueType);
+      }
+
+      // Sort by timestamp (newest first)
+      return filteredTickets.sort((a, b) => b.timestamp - a.timestamp);
+    } catch (error) {
+      console.error('Error fetching support tickets:', error);
+      throw error;
+    }
+  }
+
+  async getById(id: string): Promise<SupportTicket | null> {
+    try {
+      const ticketRef = ref(database, `${this.basePath}/${id}`);
+      const snapshot = await get(ticketRef);
+
+      if (!snapshot.exists()) return null;
+
+      return {
+        id,
+        ...snapshot.val()
+      };
+    } catch (error) {
+      console.error('Error fetching support ticket:', error);
+      throw error;
+    }
+  }
+
+  async updateStatus(id: string, status: 'pending' | 'in_progress' | 'resolved', adminId?: string): Promise<void> {
+    try {
+      const ticketRef = ref(database, `${this.basePath}/${id}`);
+      const updates: any = { status };
+
+      if (adminId) {
+        updates.adminId = adminId;
+      }
+
+      if (status === 'resolved') {
+        updates.respondedAt = Date.now();
+      }
+
+      await update(ticketRef, updates);
+    } catch (error) {
+      console.error('Error updating ticket status:', error);
+      throw error;
+    }
+  }
+
+  async getMessages(ticketId: string): Promise<SupportMessage[]> {
+    try {
+      const messagesRef = ref(database, `${this.basePath}/${ticketId}/messages`);
+      const snapshot = await get(messagesRef);
+
+      if (!snapshot.exists()) return [];
+
+      const messages: SupportMessage[] = [];
+      snapshot.forEach((child) => {
+        messages.push({
+          id: child.key!,
+          ...child.val()
+        });
+      });
+
+      // Sort by timestamp
+      return messages.sort((a, b) => a.timestamp - b.timestamp);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      throw error;
+    }
+  }
+
+  async sendMessage(ticketId: string, message: Omit<SupportMessage, 'id'>): Promise<string> {
+    try {
+      const messagesRef = ref(database, `${this.basePath}/${ticketId}/messages`);
+      const newMessageRef = push(messagesRef);
+      await set(newMessageRef, message);
+
+      // Update ticket status if admin is responding for the first time
+      if (message.senderType === 'admin') {
+        const ticketRef = ref(database, `${this.basePath}/${ticketId}`);
+        const ticketSnapshot = await get(ticketRef);
+        const ticket = ticketSnapshot.val();
+
+        if (ticket && ticket.status === 'pending') {
+          await this.updateStatus(ticketId, 'in_progress', message.senderId);
+        }
+      }
+
+      return newMessageRef.key!;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
+  }
+
+  async getStats(): Promise<{
+    total: number;
+    pending: number;
+    inProgress: number;
+    resolved: number;
+  }> {
+    try {
+      const tickets = await this.getAll();
+
+      return {
+        total: tickets.length,
+        pending: tickets.filter(t => t.status === 'pending').length,
+        inProgress: tickets.filter(t => t.status === 'in_progress').length,
+        resolved: tickets.filter(t => t.status === 'resolved').length
+      };
+    } catch (error) {
+      console.error('Error getting support stats:', error);
+      throw error;
+    }
+  }
+}
+
 // Export service instances
 export const healthTipsService = new HealthTipsService();
 export const categoriesService = new CategoriesService();
@@ -649,6 +792,7 @@ export const videosService = new VideosService();
 export const usersService = new UsersService();
 export const analyticsService = new AnalyticsService();
 export const remindersService = new RemindersService();
+export const supportService = new SupportService();
 
 // Media Service
 export class MediaService {

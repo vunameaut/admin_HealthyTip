@@ -71,6 +71,29 @@ export default async function handler(
         respondedAt: Date.now(),
         respondedBy: adminName || 'Admin',
       });
+
+      // Also update the corresponding issue in /issues node
+      // Query issues by userId
+      const issuesRef = db.ref('issues');
+      const issuesQuery = issuesRef.orderByChild('userId').equalTo(userId);
+      const issuesSnapshot = await issuesQuery.get();
+
+      if (issuesSnapshot.exists()) {
+        const updates: any = {};
+        issuesSnapshot.forEach((child) => {
+          const issueData = child.val();
+          // Update if status is not already resolved
+          if (issueData.status !== 'resolved') {
+            updates[`issues/${child.key}/status`] = 'resolved';
+            updates[`issues/${child.key}/adminResponse`] = responseMessage;
+            updates[`issues/${child.key}/respondedAt`] = Date.now();
+          }
+        });
+
+        if (Object.keys(updates).length > 0) {
+          await db.ref().update(updates);
+        }
+      }
     }
 
     return res.status(201).json({

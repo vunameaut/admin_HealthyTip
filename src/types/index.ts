@@ -338,3 +338,30 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
     totalPages: number;
   };
 }
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  issueType: string;
+  subject: string;
+  description: string;
+  imageUrl?: string;
+  status: 'pending' | 'in_progress' | 'resolved';
+  timestamp: number;
+  respondedAt?: number;
+  adminResponse?: string;
+  adminId?: string;
+  messages?: Record<string, SupportMessage>;
+}
+
+export interface SupportMessage {
+  id: string;
+  text: string;
+  imageUrl?: string;
+  senderId: string;
+  senderType: 'user' | 'admin';
+  senderName: string;
+  timestamp: number;
+}
