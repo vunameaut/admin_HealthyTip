@@ -204,7 +204,8 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send response');
+        const error: Error = new Error('Failed to send response');
+        throw error;
       }
 
       toast.success('Đã gửi phản hồi đến người dùng');
