@@ -80,18 +80,40 @@ export default async function handler(
 
       if (issuesSnapshot.exists()) {
         const updates: any = {};
+        let issueId: string | null = null;
+
         issuesSnapshot.forEach((child) => {
           const issueData = child.val();
+          issueId = child.key;
+
           // Update if status is not already resolved
           if (issueData.status !== 'resolved') {
-            updates[`issues/${child.key}/status`] = 'resolved';
+            updates[`issues/${child.key}/status`] = 'in_progress';
             updates[`issues/${child.key}/adminResponse`] = responseMessage;
             updates[`issues/${child.key}/respondedAt`] = Date.now();
+            updates[`issues/${child.key}/adminId`] = adminName || 'Admin';
           }
         });
 
         if (Object.keys(updates).length > 0) {
           await db.ref().update(updates);
+        }
+
+        // ADD MESSAGE TO CHAT
+        // Create a chat message in /issues/{issueId}/messages
+        if (issueId) {
+          const messagesRef = db.ref(`issues/${issueId}/messages`);
+          const newMessageRef = messagesRef.push();
+
+          const chatMessage = {
+            text: responseMessage,
+            senderId: 'admin',
+            senderType: 'admin',
+            senderName: adminName || 'Admin',
+            timestamp: Date.now(),
+          };
+
+          await newMessageRef.set(chatMessage);
         }
       }
     }
