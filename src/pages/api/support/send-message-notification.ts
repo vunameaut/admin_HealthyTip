@@ -94,6 +94,8 @@ export default async function handler(
               data: {
                 type: 'SUPPORT_REPLY',
                 ticketId: ticketId,
+                title: 'Admin đã trả lời yêu cầu hỗ trợ',
+                body: message.length > 100 ? message.substring(0, 100) + '...' : message,
               },
             });
           } catch (fcmError) {
