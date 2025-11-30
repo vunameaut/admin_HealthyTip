@@ -644,7 +644,7 @@ export class RemindersService {
 
 // Support Tickets Service
 export class SupportService {
-  private basePath = 'issues';
+  private basePath = 'support_tickets';
 
   async getAll(filters?: { status?: string; issueType?: string }): Promise<SupportTicket[]> {
     try {
