@@ -650,7 +650,29 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
                   Xem chi tiết ticket
                 </Button>
               )}
-              {selectedNotification && selectedNotification.actionUrl && (
+              {selectedNotification && selectedNotification.type === 'USER_FEEDBACK' && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => {
+                    const userId = selectedNotification.data?.userId || selectedNotification.createdBy;
+                    const ticketId = selectedNotification.data?.ticketId;
+
+                    // Navigate with query params to auto-open the ticket chat
+                    if (userId) {
+                      router.push(`/support?userId=${userId}${ticketId ? `&ticketId=${ticketId}` : ''}`);
+                    } else {
+                      router.push('/support');
+                    }
+                    setDetailsOpen(false);
+                  }}
+                >
+                  Mở chat hỗ trợ
+                </Button>
+              )}
+              {selectedNotification && selectedNotification.actionUrl &&
+               selectedNotification.type !== 'USER_REPORT' &&
+               selectedNotification.type !== 'USER_FEEDBACK' && (
                 <Button
                   variant="outlined"
                   onClick={() => handleActionClick(selectedNotification)}
