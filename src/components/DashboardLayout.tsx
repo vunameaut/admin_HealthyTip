@@ -143,22 +143,13 @@ export default function DashboardLayout({
     console.log('=== NOTIFICATION CLICKED ===');
     console.log('Full notification object:', JSON.stringify(notification, null, 2));
     console.log('Type:', notification.type);
-    console.log('reportId (top level):', notification.reportId);
-    console.log('reportId (in data):', notification.data?.reportId);
-    console.log('notification.id:', notification.id);
-    console.log('All keys:', Object.keys(notification));
     
-    // Xử lý routing dựa trên type - Thêm USER_REPORT vào các type hợp lệ
-    if (notification.type === 'NEW_REPORT' || 
-        notification.type === 'USER_REPLY' || 
-        notification.type === 'USER_REPORT') {
-      // Report system - Lấy reportId từ nhiều nguồn
-      // Ưu tiên notification.id vì Firebase đang lưu reportId làm key
-      const reportId = notification.id || 
-                       notification.reportId || 
-                       notification.data?.reportId;
+    // Xử lý routing dựa trên type
+    // NEW_REPORT và USER_REPLY: Navigate đến report chat detail
+    if (notification.type === 'NEW_REPORT' || notification.type === 'USER_REPLY') {
+      const reportId = notification.reportId || notification.data?.reportId;
       
-      console.log('✅ Resolved reportId:', reportId);
+      console.log('✅ Report chat - reportId:', reportId);
       
       if (reportId) {
         console.log('🚀 Navigating to /reports/' + reportId);
@@ -166,9 +157,17 @@ export default function DashboardLayout({
         handleNotificationClose();
         return;
       } else {
-        console.error('❌ Missing reportId in notification');
-        toast.error('Không tìm thấy ID báo cáo trong thông báo');
+        console.error('❌ Missing reportId in NEW_REPORT/USER_REPLY notification');
+        toast.error('Không tìm thấy reportId trong thông báo');
       }
+    }
+    // USER_REPORT: Notification về báo cáo nội dung/lỗi/spam (không phải report chat)
+    // Navigate đến trang admin notifications để xem chi tiết
+    else if (notification.type === 'USER_REPORT') {
+      console.log('📝 User report notification - navigate to admin notifications');
+      router.push('/admin-notifications');
+      handleNotificationClose();
+      return;
     } 
     // Support/Ticket system cũ
     else if (notification.data?.reportId) {
