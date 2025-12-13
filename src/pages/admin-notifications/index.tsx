@@ -59,15 +59,19 @@ import { useRouter } from 'next/router';
 interface AdminNotification {
   id: string;
   type: 'USER_REPORT' | 'CONTENT_PENDING' | 'CONTENT_FLAGGED' | 'NEW_USER' |
-        'SYSTEM_ERROR' | 'HIGH_ENGAGEMENT' | 'SECURITY_ALERT' | 'DATA_INTEGRITY' | 'USER_FEEDBACK';
+        'SYSTEM_ERROR' | 'HIGH_ENGAGEMENT' | 'SECURITY_ALERT' | 'DATA_INTEGRITY' | 'USER_FEEDBACK' |
+        'NEW_REPORT' | 'USER_REPLY'; // Thêm type cho hệ thống Report mới
   title: string;
   message: string;
   data?: any;
+  reportId?: string; // Thêm reportId cho Report system
+  userId?: string;
+  userName?: string;
   read: boolean;
   resolved: boolean;
   createdAt: number;
   createdBy?: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  priority: 'low' | 'medium' | 'high' | 'critical' | 'normal';
   actionUrl?: string;
 }
 
@@ -238,6 +242,8 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'USER_REPORT': return <Report color="error" />;
+      case 'NEW_REPORT': return <Report color="primary" />;
+      case 'USER_REPLY': return <Feedback color="info" />;
       case 'CONTENT_PENDING': return <Article color="warning" />;
       case 'CONTENT_FLAGGED': return <Warning color="warning" />;
       case 'NEW_USER': return <PersonAdd color="info" />;
@@ -253,6 +259,8 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
   const getNotificationColor = (type: string) => {
     switch (type) {
       case 'USER_REPORT': return '#f44336';
+      case 'NEW_REPORT': return '#2196f3';
+      case 'USER_REPLY': return '#00bcd4';
       case 'CONTENT_PENDING': return '#ff9800';
       case 'CONTENT_FLAGGED': return '#ff9800';
       case 'NEW_USER': return '#2196f3';
@@ -630,6 +638,28 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
               <Button onClick={() => setDetailsOpen(false)}>
                 Đóng
               </Button>
+              {/* NEW REPORT & USER REPLY - Mở report detail */}
+              {selectedNotification && (selectedNotification.type === 'NEW_REPORT' || selectedNotification.type === 'USER_REPLY') && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => {
+                    const reportId = selectedNotification.reportId || selectedNotification.data?.reportId;
+                    
+                    if (!reportId) {
+                      toast.error('Không tìm thấy ID báo cáo');
+                      console.error('Missing reportId in notification:', selectedNotification);
+                      return;
+                    }
+
+                    console.log('Opening report:', reportId);
+                    router.push(`/reports/${reportId}`);
+                    setDetailsOpen(false);
+                  }}
+                >
+                  {selectedNotification.type === 'NEW_REPORT' ? 'Xem báo cáo mới' : 'Xem cuộc hội thoại'}
+                </Button>
+              )}
               {selectedNotification && selectedNotification.type === 'USER_REPORT' && (
                 <Button
                   variant="contained"
@@ -672,7 +702,9 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
               )}
               {selectedNotification && selectedNotification.actionUrl &&
                selectedNotification.type !== 'USER_REPORT' &&
-               selectedNotification.type !== 'USER_FEEDBACK' && (
+               selectedNotification.type !== 'USER_FEEDBACK' &&
+               selectedNotification.type !== 'NEW_REPORT' &&
+               selectedNotification.type !== 'USER_REPLY' && (
                 <Button
                   variant="outlined"
                   onClick={() => handleActionClick(selectedNotification)}
