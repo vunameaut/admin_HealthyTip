@@ -140,11 +140,35 @@ export default function DashboardLayout({
   };
 
   const handleNotificationItemClick = (notification: any) => {
-    if (notification.data?.reportId) {
+    console.log('Notification clicked:', notification);
+    
+    // Xử lý routing dựa trên type
+    if (notification.type === 'NEW_REPORT' || notification.type === 'USER_REPLY') {
+      // Report system mới - Lấy reportId
+      const reportId = notification.reportId || notification.data?.reportId;
+      
+      if (reportId) {
+        console.log('Opening report:', reportId);
+        router.push(`/reports/${reportId}`);
+        handleNotificationClose();
+        return;
+      } else {
+        console.error('Missing reportId in notification:', notification);
+        toast.error('Không tìm thấy ID báo cáo');
+      }
+    } 
+    // Support/Ticket system cũ
+    else if (notification.data?.reportId) {
       router.push(`/support?reportId=${notification.data.reportId}`);
+      handleNotificationClose();
+      return;
     } else if (notification.data?.ticketId) {
       router.push(`/support?ticketId=${notification.data.ticketId}`);
+      handleNotificationClose();
+      return;
     }
+    
+    // Nếu không có action cụ thể, đóng popup
     handleNotificationClose();
   };
 
