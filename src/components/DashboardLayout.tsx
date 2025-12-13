@@ -145,16 +145,20 @@ export default function DashboardLayout({
     console.log('Type:', notification.type);
     console.log('reportId (top level):', notification.reportId);
     console.log('reportId (in data):', notification.data?.reportId);
+    console.log('notification.id:', notification.id);
     console.log('All keys:', Object.keys(notification));
     
-    // Xử lý routing dựa trên type
-    if (notification.type === 'NEW_REPORT' || notification.type === 'USER_REPLY') {
-      // Report system mới - Lấy reportId từ nhiều nguồn
-      const reportId = notification.reportId || 
-                       notification.data?.reportId || 
-                       notification.id; // Thử dùng notification.id làm fallback
+    // Xử lý routing dựa trên type - Thêm USER_REPORT vào các type hợp lệ
+    if (notification.type === 'NEW_REPORT' || 
+        notification.type === 'USER_REPLY' || 
+        notification.type === 'USER_REPORT') {
+      // Report system - Lấy reportId từ nhiều nguồn
+      // Ưu tiên notification.id vì Firebase đang lưu reportId làm key
+      const reportId = notification.id || 
+                       notification.reportId || 
+                       notification.data?.reportId;
       
-      console.log('Resolved reportId:', reportId);
+      console.log('✅ Resolved reportId:', reportId);
       
       if (reportId) {
         console.log('🚀 Navigating to /reports/' + reportId);
