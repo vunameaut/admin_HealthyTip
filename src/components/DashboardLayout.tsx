@@ -140,34 +140,46 @@ export default function DashboardLayout({
   };
 
   const handleNotificationItemClick = (notification: any) => {
-    console.log('Notification clicked:', notification);
+    console.log('=== NOTIFICATION CLICKED ===');
+    console.log('Full notification object:', JSON.stringify(notification, null, 2));
+    console.log('Type:', notification.type);
+    console.log('reportId (top level):', notification.reportId);
+    console.log('reportId (in data):', notification.data?.reportId);
+    console.log('All keys:', Object.keys(notification));
     
     // Xử lý routing dựa trên type
     if (notification.type === 'NEW_REPORT' || notification.type === 'USER_REPLY') {
-      // Report system mới - Lấy reportId
-      const reportId = notification.reportId || notification.data?.reportId;
+      // Report system mới - Lấy reportId từ nhiều nguồn
+      const reportId = notification.reportId || 
+                       notification.data?.reportId || 
+                       notification.id; // Thử dùng notification.id làm fallback
+      
+      console.log('Resolved reportId:', reportId);
       
       if (reportId) {
-        console.log('Opening report:', reportId);
+        console.log('🚀 Navigating to /reports/' + reportId);
         router.push(`/reports/${reportId}`);
         handleNotificationClose();
         return;
       } else {
-        console.error('Missing reportId in notification:', notification);
-        toast.error('Không tìm thấy ID báo cáo');
+        console.error('❌ Missing reportId in notification');
+        toast.error('Không tìm thấy ID báo cáo trong thông báo');
       }
     } 
     // Support/Ticket system cũ
     else if (notification.data?.reportId) {
+      console.log('Old system - support with reportId');
       router.push(`/support?reportId=${notification.data.reportId}`);
       handleNotificationClose();
       return;
     } else if (notification.data?.ticketId) {
+      console.log('Old system - support with ticketId');
       router.push(`/support?ticketId=${notification.data.ticketId}`);
       handleNotificationClose();
       return;
     }
     
+    console.log('⚠️ No action handler found, closing popup');
     // Nếu không có action cụ thể, đóng popup
     handleNotificationClose();
   };
