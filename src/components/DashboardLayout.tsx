@@ -25,6 +25,8 @@ import {
   Card,
   CardContent,
   Chip,
+  Popover,
+  Paper,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -50,6 +52,7 @@ import {
   Favorite,
   FitnessCenter,
   Support,
+  BugReport,
 } from '@mui/icons-material';
 import { auth, database } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -77,6 +80,8 @@ export default function DashboardLayout({
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({});
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -92,19 +97,29 @@ export default function DashboardLayout({
   // Listen for admin notifications
   useEffect(() => {
     const notificationsRef = ref(database, 'admin_notifications');
-    const notificationsQuery = query(notificationsRef, orderByChild('read'));
+    const notificationsQuery = query(notificationsRef, orderByChild('createdAt'));
 
     const unsubscribe = onValue(notificationsQuery, (snapshot) => {
       if (snapshot.exists()) {
         let unreadCount = 0;
+        const notifications: any[] = [];
         snapshot.forEach((child) => {
           const notification = child.val();
+          const notificationData = {
+            id: child.key,
+            ...notification,
+          };
+          notifications.push(notificationData);
           if (!notification.read) {
             unreadCount++;
           }
         });
+        // Sort by createdAt descending
+        notifications.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        setAdminNotifications(notifications);
         setUnreadNotificationsCount(unreadCount);
       } else {
+        setAdminNotifications([]);
         setUnreadNotificationsCount(0);
       }
     });
@@ -114,6 +129,23 @@ export default function DashboardLayout({
 
   const handleProfileMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+
+  const handleNotificationClose = () => {
+    setNotificationAnchorEl(null);
+  };
+
+  const handleNotificationItemClick = (notification: any) => {
+    if (notification.data?.reportId) {
+      router.push(`/support?reportId=${notification.data.reportId}`);
+    } else if (notification.data?.ticketId) {
+      router.push(`/support?ticketId=${notification.data.ticketId}`);
+    }
+    handleNotificationClose();
   };
 
   const handleLogout = async () => {
@@ -134,12 +166,6 @@ export default function DashboardLayout({
       title: 'Dashboard',
       icon: Dashboard,
       path: '/dashboard',
-    },
-    {
-      id: 'admin-notifications',
-      title: 'Thông báo Admin',
-      icon: Notifications,
-      path: '/admin-notifications',
     },
     {
       id: 'support',
@@ -515,7 +541,7 @@ export default function DashboardLayout({
             
             <IconButton
               color="inherit"
-              onClick={() => router.push('/admin-notifications')}
+              onClick={handleNotificationClick}
               sx={{
                 color: theme.palette.text.primary,
                 '&:hover': {
@@ -536,6 +562,71 @@ export default function DashboardLayout({
                 <Notifications />
               </Badge>
             </IconButton>
+
+            <Popover
+              open={Boolean(notificationAnchorEl)}
+              anchorEl={notificationAnchorEl}
+              onClose={handleNotificationClose}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              PaperProps={{
+                sx: {
+                  width: 400,
+                  maxHeight: 500,
+                  mt: 1,
+                }
+              }}
+            >
+              <Paper>
+                <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                  <Typography variant="h6">Thông báo Admin</Typography>
+                </Box>
+                <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                  {adminNotifications.length === 0 ? (
+                    <Box sx={{ p: 3, textAlign: 'center' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Không có thông báo nào
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <List>
+                      {adminNotifications.slice(0, 10).map((notification) => (
+                        <ListItemButton
+                          key={notification.id}
+                          onClick={() => handleNotificationItemClick(notification)}
+                          sx={{
+                            borderBottom: 1,
+                            borderColor: 'divider',
+                            backgroundColor: notification.read ? 'transparent' : theme.palette.primary.main + '08',
+                            '&:hover': {
+                              backgroundColor: theme.palette.primary.main + '15',
+                            }
+                          }}
+                        >
+                          <Box sx={{ width: '100%' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: notification.read ? 400 : 600 }}>
+                              {notification.title}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                              {notification.message}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                              {notification.createdAt ? new Date(notification.createdAt).toLocaleString('vi-VN') : ''}
+                            </Typography>
+                          </Box>
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  )}
+                </Box>
+              </Paper>
+            </Popover>
 
             <IconButton
               onClick={handleProfileMenuOpen}

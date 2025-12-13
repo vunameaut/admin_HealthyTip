@@ -1,82 +1,104 @@
 ﻿import type { NextApiRequest, NextApiResponse } from 'next';
-import { getDatabase, getMessaging, saveNotificationHistory } from '@/lib/firebaseAdmin';
+import { getDatabase, getMessaging } from '@/lib/firebaseAdmin';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+/**
+ * API endpoint để gửi thông báo tới user khi admin reply
+ * POST /api/notifications/send-to-user
+ */
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
     const { userId, title, body, data } = req.body;
 
+    // Validate required fields
     if (!userId || !title || !body) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields: userId, title, body'
+      return res.status(400).json({ 
+        error: 'Missing required fields: userId, title, body' 
       });
     }
 
-    console.log(' Sending notification to user:', userId);
-
+    // Get Firebase Admin Database and Messaging
     const db = getDatabase();
-    const messaging = getMessaging();
 
-    const userSnapshot = await db.ref('users/' + userId).once('value');
-    const user = userSnapshot.val();
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    if (!user.fcmToken) {
-      return res.status(400).json({
-        success: false,
-        error: 'User has no FCM token'
-      });
-    }
-
-    const message = {
-      token: user.fcmToken,
-      notification: {
-        title: title,
-        body: body
-      },
-      data: {
-        type: 'admin_message',
-        ...data,
-        timestamp: Date.now().toString()
-      }
-    };
-
-    const response = await messaging.send(message);
-
-    // Save notification history
-    await saveNotificationHistory({
-      type: 'admin_message',
+    // 1. Save notification to user_notifications in Firebase
+    const userNotificationsRef = db.ref(`user_notifications/${userId}`);
+    const notification = {
+      type: data?.type || 'ADMIN_REPLY',
+      reportId: data?.reportId || '',
       title,
       body,
-      data: data || {},
-      sentTo: [userId],
-      sentCount: 1,
-      failureCount: 0,
-      status: 'success'
-    });
+      read: false,
+      createdAt: Date.now(),
+    };
 
-    res.json({
-      success: true,
-      message: 'Notification sent successfully',
-      messageId: response,
-      recipient: userId
-    });
+    await userNotificationsRef.push(notification);
+    console.log(`[API] User notification saved for user: ${userId}`);
+
+    // 2. Try to send FCM push notification
+    try {
+      // Get user's FCM token from database
+      const userRef = db.ref(`users/${userId}/fcmToken`);
+      const tokenSnapshot = await userRef.once('value');
+      const fcmToken = tokenSnapshot.val();
+
+      if (fcmToken) {
+        const messaging = getMessaging();
+        
+        // Data-only message để app xử lý notification hoàn toàn
+        // Điều này đảm bảo click notification sẽ mở đúng activity
+        const message = {
+          data: {
+            type: data?.type || 'ADMIN_REPLY',
+            reportId: data?.reportId || '',
+            title: title,
+            body: body,
+            click_action: 'OPEN_REPORT_CHAT',
+          },
+          token: fcmToken,
+          android: {
+            priority: 'high' as const,
+          },
+        };
+
+        await messaging.send(message);
+        console.log(`[API] FCM push sent to user: ${userId}`);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Notification sent successfully',
+          pushSent: true,
+        });
+      } else {
+        console.log(`[API] No FCM token found for user: ${userId}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Notification saved, but no FCM token found',
+          pushSent: false,
+        });
+      }
+    } catch (fcmError: any) {
+      console.error('[API] FCM send error:', fcmError);
+      // Still return success because notification was saved
+      return res.status(200).json({
+        success: true,
+        message: 'Notification saved, FCM send failed',
+        pushSent: false,
+        fcmError: fcmError.message,
+      });
+    }
 
   } catch (error: any) {
-    console.error(' Error sending notification to user:', error);
-    res.status(500).json({
+    console.error('[API] Error sending user notification:', error);
+    return res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Internal Server Error',
+      message: error.message,
     });
   }
 }

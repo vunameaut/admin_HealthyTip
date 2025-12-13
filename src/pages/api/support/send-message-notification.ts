@@ -63,7 +63,7 @@ export default async function handler(
       const newNotificationRef = userNotificationsRef.push();
 
       const userNotification = {
-        type: 'SUPPORT_REPLY',
+        type: 'support_reply',
         title: 'Admin đã trả lời yêu cầu hỗ trợ',
         message: message.length > 100 ? message.substring(0, 100) + '...' : message,
         data: {
@@ -92,8 +92,8 @@ export default async function handler(
                 body: message.length > 100 ? message.substring(0, 100) + '...' : message,
               },
               data: {
-                type: 'SUPPORT_REPLY',
-                ticketId: ticketId,
+                type: 'support_reply',
+                ticket_id: ticketId,
                 title: 'Admin đã trả lời yêu cầu hỗ trợ',
                 body: message.length > 100 ? message.substring(0, 100) + '...' : message,
               },
