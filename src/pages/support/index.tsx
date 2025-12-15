@@ -223,6 +223,42 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
         console.error('[Support] Error clearing unread flag:', error);
       }
     }
+    
+    // LUÔN mark related admin notification as resolved khi mở chat (bất kể hasUnreadUserMessage)
+    try {
+      const notificationsRef = ref(database, 'admin_notifications');
+      const notificationQuery = query(
+        notificationsRef,
+        orderByChild('data/ticketId'),
+        equalTo(ticket.id)
+      );
+      
+      const snapshot = await get(notificationQuery);
+      if (snapshot.exists()) {
+        const updates: any = {};
+        snapshot.forEach((child) => {
+          const notification = child.val();
+          // Mark resolved nếu là USER_FEEDBACK và chưa resolved
+          if (notification.type === 'USER_FEEDBACK' && !notification.resolved) {
+            updates[`admin_notifications/${child.key}/resolved`] = true;
+            updates[`admin_notifications/${child.key}/read`] = true;
+            console.log('[Support] Will mark notification as resolved:', child.key);
+          }
+        });
+        
+        if (Object.keys(updates).length > 0) {
+          await update(ref(database), updates);
+          console.log('[Support] Successfully marked', Object.keys(updates).length / 2, 'notifications as resolved');
+        } else {
+          console.log('[Support] No unresolved notifications found for ticket:', ticket.id);
+        }
+      } else {
+        console.log('[Support] No notifications found for ticket:', ticket.id);
+      }
+    } catch (notifError) {
+      console.error('[Support] Error marking notification as resolved:', notifError);
+      // Don't fail if this fails
+    }
   };
 
   const handleCloseChat = () => {
