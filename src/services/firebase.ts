@@ -783,6 +783,19 @@ export class SupportService {
       throw error;
     }
   }
+
+  async clearUnreadUserMessage(ticketId: string): Promise<void> {
+    try {
+      const ticketRef = ref(database, `${this.basePath}/${ticketId}`);
+      await update(ticketRef, { 
+        hasUnreadUserMessage: false,
+        lastUserMessageAt: null
+      });
+    } catch (error) {
+      console.error('Error clearing unread user message flag:', error);
+      throw error;
+    }
+  }
 }
 
 // Export service instances

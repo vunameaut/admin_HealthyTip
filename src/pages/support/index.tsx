@@ -36,7 +36,8 @@ import {
   Send,
   Close,
   Image as ImageIcon,
-  AttachFile
+  AttachFile,
+  FiberManualRecord
 } from '@mui/icons-material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import LayoutWrapper from '../../components/LayoutWrapper';
@@ -155,6 +156,17 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
   const handleOpenChat = async (ticket: SupportTicket) => {
     setSelectedTicket(ticket);
     setChatOpen(true);
+    
+    // Clear unread flag khi admin mở chat
+    if (ticket.hasUnreadUserMessage) {
+      try {
+        await supportService.clearUnreadUserMessage(ticket.id);
+        // Reload data để cập nhật UI
+        loadData();
+      } catch (error) {
+        console.error('Error clearing unread flag:', error);
+      }
+    }
   };
 
   const handleCloseChat = () => {
@@ -276,6 +288,25 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
 
   const columns: GridColDef[] = [
     {
+      field: 'indicator',
+      headerName: '',
+      width: 50,
+      sortable: false,
+      renderCell: (params) => {
+        // Kiểm tra xem ticket có tin nhắn mới từ user không
+        const hasUnread = params.row.hasUnreadUserMessage || false;
+        return hasUnread ? (
+          <FiberManualRecord 
+            sx={{ 
+              color: '#f44336', 
+              fontSize: 16,
+              animation: 'pulse 2s infinite'
+            }} 
+          />
+        ) : null;
+      }
+    },
+    {
       field: 'id',
       headerName: 'Ticket ID',
       width: 100,
@@ -310,9 +341,19 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
       headerName: 'Tiêu đề',
       flex: 1,
       renderCell: (params) => (
-        <Typography variant="body2" noWrap>
-          {params.value}
-        </Typography>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="body2" noWrap>
+            {params.value}
+          </Typography>
+          {params.row.hasUnreadUserMessage && (
+            <Chip 
+              label="Tin nhắn mới" 
+              size="small" 
+              color="error"
+              sx={{ height: 20, fontSize: '0.7rem' }}
+            />
+          )}
+        </Box>
       )
     },
     {
@@ -387,6 +428,18 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
   return (
     <AuthGuard>
       <LayoutWrapper darkMode={darkMode} toggleDarkMode={toggleDarkMode}>
+        <style>
+          {`
+            @keyframes pulse {
+              0%, 100% {
+                opacity: 1;
+              }
+              50% {
+                opacity: 0.3;
+              }
+            }
+          `}
+        </style>
         <Box p={3}>
           {/* Header */}
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
