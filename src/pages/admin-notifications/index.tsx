@@ -147,12 +147,32 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
 
   const handleMarkAsRead = async (notificationId: string, read: boolean) => {
     try {
+      // Update local state ngay lập tức để UI phản hồi nhanh
+      setNotifications(prevNotifications =>
+        prevNotifications.map(n => {
+          if (n.id === notificationId) {
+            return { ...n, read };
+          }
+          return n;
+        })
+      );
+      
+      // Update Firebase
       const notificationRef = ref(database, `admin_notifications/${notificationId}`);
       await update(notificationRef, { read });
       toast.success(read ? 'Đã đánh dấu đã đọc' : 'Đã đánh dấu chưa đọc');
     } catch (error) {
       console.error('Error updating notification:', error);
       toast.error('Có lỗi xảy ra');
+      // Revert local state nếu có lỗi
+      setNotifications(prevNotifications =>
+        prevNotifications.map(n => {
+          if (n.id === notificationId) {
+            return { ...n, read: !read };
+          }
+          return n;
+        })
+      );
     }
   };
 
@@ -206,6 +226,11 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
 
   const handleActionClick = (notification: AdminNotification) => {
     console.log('[handleActionClick] Notification data:', notification);
+    
+    // Đánh dấu notification là đã đọc khi click
+    if (!notification.read) {
+      handleMarkAsRead(notification.id, true);
+    }
     
     // Xử lý các loại notification khác nhau
     if (notification.type === 'USER_FEEDBACK') {
