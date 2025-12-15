@@ -37,7 +37,8 @@ import {
   Close,
   Image as ImageIcon,
   AttachFile,
-  FiberManualRecord
+  FiberManualRecord,
+  Mail
 } from '@mui/icons-material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import LayoutWrapper from '../../components/LayoutWrapper';
@@ -477,6 +478,12 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
       value: stats.resolved,
       icon: <CheckCircle />,
       color: '#2e7d32'
+    },
+    {
+      title: 'Tin nhắn chưa đọc',
+      value: tickets.filter(t => t.hasUnreadUserMessage).length,
+      icon: <Mail />,
+      color: '#d32f2f'
     }
   ];
 
