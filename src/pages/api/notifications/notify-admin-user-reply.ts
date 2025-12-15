@@ -19,17 +19,22 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  console.log('[notify-admin-user-reply] Request received:', req.body);
+
   try {
     const { reportId, userId, userName, messageText } = req.body;
 
     // Validate required fields
     if (!reportId || !userId || !userName || !messageText) {
+      console.error('[notify-admin-user-reply] Missing required fields');
       return res.status(400).json({ 
-        error: 'Missing required fields: reportId, userId, userName, messageText' 
+        error: 'Missing required fields: reportId, userId, userName, messageText',
+        received: { reportId, userId, userName, hasMessageText: !!messageText }
       });
     }
 
     // Get Firebase Admin Database
+    console.log('[notify-admin-user-reply] Getting Firebase database...');
     const db = getDatabase();
 
     // Tạo admin notification trong Firebase
@@ -66,11 +71,13 @@ export default async function handler(
     });
 
   } catch (error: any) {
-    console.error('[API] Error creating admin notification:', error);
+    console.error('[notify-admin-user-reply] Error creating admin notification:', error);
+    console.error('[notify-admin-user-reply] Error stack:', error.stack);
     return res.status(500).json({
       success: false,
       error: 'Internal Server Error',
-      details: error.message,
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 }

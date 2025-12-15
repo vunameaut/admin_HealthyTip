@@ -13,16 +13,21 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  console.log('[send-to-user] Request received:', JSON.stringify(req.body, null, 2));
+
   try {
     const { userId, title, body, data } = req.body;
 
     // Validate required fields
     if (!userId || !title || !body) {
+      console.error('[send-to-user] Missing required fields');
       return res.status(400).json({ 
-        error: 'Missing required fields: userId, title, body' 
+        error: 'Missing required fields: userId, title, body',
+        received: { hasUserId: !!userId, hasTitle: !!title, hasBody: !!body }
       });
     }
 
+    console.log('[send-to-user] Getting Firebase Admin...');
     // Get Firebase Admin Database and Messaging
     const db = getDatabase();
 
@@ -50,24 +55,28 @@ export default async function handler(
       if (fcmToken) {
         const messaging = getMessaging();
         
-        // Data-only message để app xử lý notification hoàn toàn
-        // Điều này đảm bảo click notification sẽ mở đúng activity
+        // ✅ FIXED: Gửi data payload với tất cả thông tin cần thiết
+        // Android app sẽ xử lý trong onMessageReceived
         const message = {
           data: {
             type: data?.type || 'ADMIN_REPLY',
-            reportId: data?.reportId || '',
-            title: title,
-            body: body,
-            click_action: 'OPEN_REPORT_CHAT',
+            reportId: (data?.reportId || '').toString(),
+            report_id: (data?.reportId || '').toString(), // Backup key
+            title: title.toString(),
+            body: body.toString(),
+            timestamp: Date.now().toString(),
           },
           token: fcmToken,
           android: {
             priority: 'high' as const,
+            // Đảm bảo data được gửi ngay cả khi app ở background
+            ttl: 3600 * 1000, // 1 hour
           },
         };
 
+        console.log(`[API] Sending FCM to user ${userId} with data:`, message.data);
         await messaging.send(message);
-        console.log(`[API] FCM push sent to user: ${userId}`);
+        console.log(`[API] FCM push sent successfully to user: ${userId}`);
 
         return res.status(200).json({
           success: true,
@@ -94,11 +103,13 @@ export default async function handler(
     }
 
   } catch (error: any) {
-    console.error('[API] Error sending user notification:', error);
+    console.error('[send-to-user] Error sending user notification:', error);
+    console.error('[send-to-user] Error stack:', error.stack);
     return res.status(500).json({
       success: false,
       error: 'Internal Server Error',
       message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 }
