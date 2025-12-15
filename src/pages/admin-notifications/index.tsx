@@ -94,6 +94,13 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
 
   useEffect(() => {
     loadNotifications();
+    
+    // Auto-refresh mỗi 10 giây
+    const intervalId = setInterval(() => {
+      loadNotifications();
+    }, 10000);
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   const loadNotifications = () => {
@@ -182,7 +189,11 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
   };
 
   const handleActionClick = (notification: AdminNotification) => {
-    if (notification.actionUrl) {
+    // Xử lý các loại notification khác nhau
+    if (notification.type === 'USER_FEEDBACK' && notification.data?.ticketId) {
+      // Mở support với ticketId để hiển thị chat ngay
+      router.push(`/support?ticketId=${notification.data.ticketId}`);
+    } else if (notification.actionUrl) {
       router.push(notification.actionUrl);
     }
   };
@@ -534,7 +545,15 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
                             </Tooltip>
                           </Box>
                         }
-                        onClick={() => handleViewDetails(notification)}
+                        onClick={() => {
+                          // Nếu là USER_FEEDBACK và có ticketId, mở support luôn
+                          if (notification.type === 'USER_FEEDBACK' && notification.data?.ticketId) {
+                            handleMarkAsRead(notification.id, true);
+                            router.push(`/support?ticketId=${notification.data.ticketId}`);
+                          } else {
+                            handleViewDetails(notification);
+                          }
+                        }}
                       >
                         <ListItemAvatar>
                           <Avatar sx={{ bgcolor: getNotificationColor(notification.type) }}>

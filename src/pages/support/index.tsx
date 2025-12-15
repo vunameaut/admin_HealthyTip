@@ -82,6 +82,13 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
 
   useEffect(() => {
     loadData();
+    
+    // Auto-refresh mỗi 10 giây
+    const intervalId = setInterval(() => {
+      loadData();
+    }, 10000);
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   // Auto-open ticket from notification
