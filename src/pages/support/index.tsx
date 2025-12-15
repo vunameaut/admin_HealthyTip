@@ -133,6 +133,11 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
         supportService.getAll(),
         supportService.getStats()
       ]);
+      console.log('[Support] Loaded tickets:', allTickets.map(t => ({ 
+        id: t.id, 
+        hasUnreadUserMessage: t.hasUnreadUserMessage,
+        lastUserMessageAt: t.lastUserMessageAt 
+      })));
       setTickets(allTickets);
       setStats(statsData);
     } catch (error) {
