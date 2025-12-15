@@ -116,26 +116,35 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
 
   // Auto-open ticket from notification
   useEffect(() => {
-    if (router.query.userId && tickets.length > 0) {
-      const userId = router.query.userId as string;
-      const ticketId = router.query.ticketId as string;
-
+    const ticketId = router.query.ticketId as string;
+    const userId = router.query.userId as string;
+    
+    console.log('[Support] Query params:', { ticketId, userId, ticketsLength: tickets.length });
+    
+    if ((ticketId || userId) && tickets.length > 0) {
       // Find ticket by ticketId first, or by userId
       let ticket: SupportTicket | undefined;
 
       if (ticketId) {
+        console.log('[Support] Looking for ticket by ID:', ticketId);
         ticket = tickets.find(t => t.id === ticketId);
-      } else {
+        console.log('[Support] Found ticket by ID:', ticket ? ticket.id : 'NOT FOUND');
+      } else if (userId) {
+        console.log('[Support] Looking for ticket by userId:', userId);
         // Find the most recent ticket from this user
         ticket = tickets
           .filter(t => t.userId === userId)
           .sort((a, b) => b.timestamp - a.timestamp)[0];
+        console.log('[Support] Found ticket by userId:', ticket ? ticket.id : 'NOT FOUND');
       }
 
       if (ticket) {
+        console.log('[Support] Opening chat for ticket:', ticket.id);
         handleOpenChat(ticket);
         // Clear query params after opening
         router.replace('/support', undefined, { shallow: true });
+      } else {
+        console.error('[Support] No ticket found with query params:', { ticketId, userId });
       }
     }
   }, [router.query, tickets]);
