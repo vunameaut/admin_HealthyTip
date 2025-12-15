@@ -354,6 +354,8 @@ export interface SupportTicket {
   adminResponse?: string;
   adminId?: string;
   messages?: Record<string, SupportMessage>;
+  hasUnreadUserMessage?: boolean;
+  lastUserMessageAt?: number;
 }
 
 export interface SupportMessage {
