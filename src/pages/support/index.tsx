@@ -198,17 +198,27 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
   };
 
   const handleOpenChat = async (ticket: SupportTicket) => {
+    console.log('[Support] Opening chat for ticket:', ticket.id, 'hasUnreadUserMessage:', ticket.hasUnreadUserMessage);
     setSelectedTicket(ticket);
     setChatOpen(true);
     
     // Clear unread flag khi admin mở chat
     if (ticket.hasUnreadUserMessage) {
       try {
+        console.log('[Support] Clearing unread flag for ticket:', ticket.id);
         await supportService.clearUnreadUserMessage(ticket.id);
-        // Reload data để cập nhật UI
-        loadData();
+        
+        // Update local state ngay lập tức để UI phản hồi nhanh
+        setTickets(prevTickets => 
+          prevTickets.map(t => 
+            t.id === ticket.id 
+              ? { ...t, hasUnreadUserMessage: false, lastUserMessageAt: null }
+              : t
+          )
+        );
+        console.log('[Support] Unread flag cleared successfully');
       } catch (error) {
-        console.error('Error clearing unread flag:', error);
+        console.error('[Support] Error clearing unread flag:', error);
       }
     }
   };
