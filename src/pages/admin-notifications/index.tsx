@@ -574,26 +574,36 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
                             </Tooltip>
                           </Box>
                         }
-                        onClick={() => {
-                          console.log('[NotificationItem] Clicked notification:', notification);
-                          // Nếu là USER_FEEDBACK và có ticketId, mở support luôn
-                          if (notification.type === 'USER_FEEDBACK') {
-                            const ticketId = notification.data?.ticketId;
-                            console.log('[NotificationItem] ticketId:', ticketId);
-                            
-                            if (ticketId) {
-                              handleMarkAsRead(notification.id, true);
-                              console.log('[NotificationItem] Navigating to /support?ticketId=' + ticketId);
-                              router.push(`/support?ticketId=${ticketId}`);
+                      >
+                        <Box
+                          onClick={() => {
+                            console.log('[NotificationItem CLICKED]', notification);
+                            // Nếu là USER_FEEDBACK và có ticketId, mở support luôn
+                            if (notification.type === 'USER_FEEDBACK') {
+                              const ticketId = notification.data?.ticketId;
+                              console.log('[NotificationItem] Type: USER_FEEDBACK, ticketId:', ticketId);
+                              console.log('[NotificationItem] Full data:', JSON.stringify(notification.data));
+                              
+                              if (ticketId) {
+                                handleMarkAsRead(notification.id, true);
+                                console.log('[NotificationItem] Navigating to /support?ticketId=' + ticketId);
+                                router.push(`/support?ticketId=${ticketId}`);
+                              } else {
+                                console.error('[NotificationItem] No ticketId found in data');
+                                // Fallback: mở dialog details
+                                handleViewDetails(notification);
+                              }
                             } else {
-                              console.error('[NotificationItem] No ticketId found');
+                              console.log('[NotificationItem] Not USER_FEEDBACK, opening details');
                               handleViewDetails(notification);
                             }
-                          } else {
-                            handleViewDetails(notification);
-                          }
-                        }}
-                      >
+                          }}
+                          sx={{ 
+                            display: 'flex', 
+                            width: '100%',
+                            cursor: 'pointer'
+                          }}
+                        >
                         <ListItemAvatar>
                           <Avatar sx={{ bgcolor: getNotificationColor(notification.type) }}>
                             {getNotificationIcon(notification.type)}
@@ -631,6 +641,7 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
                             </Box>
                           }
                         />
+                        </Box>
                       </ListItem>
                       {index < filteredNotifications.length - 1 && <Divider variant="inset" component="li" />}
                     </React.Fragment>
