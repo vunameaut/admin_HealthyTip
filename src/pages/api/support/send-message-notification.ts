@@ -134,6 +134,13 @@ export default async function handler(
 
       await newNotificationRef.set(adminNotification);
 
+      // ✅ SET FLAG: Mark ticket as having unread user message
+      const ticketRef = db.ref(`support_tickets/${ticketId}`);
+      await ticketRef.update({
+        hasUnreadUserMessage: true,
+        lastUserMessageAt: Date.now()
+      });
+
       return res.status(200).json({
         success: true,
         message: 'Admin notification sent'
