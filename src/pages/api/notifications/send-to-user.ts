@@ -53,11 +53,18 @@ export default async function handler(
       const fcmToken = tokenSnapshot.val();
 
       if (fcmToken) {
+        console.log(`[send-to-user] FCM token found for user ${userId}: ${fcmToken.substring(0, 20)}...`);
+        
         const messaging = getMessaging();
         
-        // ✅ FIXED: Gửi data payload với tất cả thông tin cần thiết
-        // Android app sẽ xử lý trong onMessageReceived
+        // ✅ CRITICAL: Gửi notification + data payload
+        // Notification payload đảm bảo hiển thị khi app ở background
+        // Data payload để app xử lý khi ở foreground
         const message = {
+          notification: {
+            title: title,
+            body: body,
+          },
           data: {
             type: data?.type || 'ADMIN_REPLY',
             reportId: (data?.reportId || '').toString(),
@@ -69,14 +76,18 @@ export default async function handler(
           token: fcmToken,
           android: {
             priority: 'high' as const,
-            // Đảm bảo data được gửi ngay cả khi app ở background
-            ttl: 3600 * 1000, // 1 hour
+            notification: {
+              sound: 'default',
+              clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            },
           },
         };
 
-        console.log(`[API] Sending FCM to user ${userId} with data:`, message.data);
-        await messaging.send(message);
-        console.log(`[API] FCM push sent successfully to user: ${userId}`);
+        console.log(`[send-to-user] Sending FCM with notification + data payload to user ${userId}`);
+        console.log(`[send-to-user] Message:`, JSON.stringify(message, null, 2));
+        
+        const response = await messaging.send(message);
+        console.log(`[send-to-user] FCM push sent successfully. Message ID: ${response}`);
 
         return res.status(200).json({
           success: true,
