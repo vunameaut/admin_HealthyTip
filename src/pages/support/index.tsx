@@ -212,7 +212,7 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
         setTickets(prevTickets => 
           prevTickets.map(t => 
             t.id === ticket.id 
-              ? { ...t, hasUnreadUserMessage: false, lastUserMessageAt: null }
+              ? { ...t, hasUnreadUserMessage: false, lastUserMessageAt: null } as SupportTicket
               : t
           )
         );
