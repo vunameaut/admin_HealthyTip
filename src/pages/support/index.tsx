@@ -45,7 +45,8 @@ import AuthGuard from '../../components/AuthGuard';
 import { supportService } from '../../services/firebase';
 import { SupportTicket, SupportMessage } from '../../types';
 import toast from 'react-hot-toast';
-import { auth } from '../../lib/firebase';
+import { auth, database } from '../../lib/firebase';
+import { ref, onValue } from 'firebase/database';
 import { useRouter } from 'next/router';
 
 interface SupportStats {
@@ -83,12 +84,34 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
   useEffect(() => {
     loadData();
     
-    // Auto-refresh mỗi 10 giây
-    const intervalId = setInterval(() => {
-      loadData();
-    }, 10000);
+    // Real-time listener cho support tickets
+    const ticketsRef = ref(database, 'support_tickets');
+    const unsubscribe = onValue(ticketsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const ticketsData: SupportTicket[] = [];
+        snapshot.forEach((child) => {
+          const ticket = child.val();
+          ticketsData.push({
+            id: child.key!,
+            ...ticket
+          });
+        });
+        // Sort by timestamp (newest first)
+        ticketsData.sort((a, b) => b.timestamp - a.timestamp);
+        setTickets(ticketsData);
+        
+        // Update stats
+        const statsData = {
+          total: ticketsData.length,
+          pending: ticketsData.filter(t => t.status === 'pending').length,
+          inProgress: ticketsData.filter(t => t.status === 'in_progress').length,
+          resolved: ticketsData.filter(t => t.status === 'resolved').length
+        };
+        setStats(statsData);
+      }
+    });
     
-    return () => clearInterval(intervalId);
+    return () => unsubscribe();
   }, []);
 
   // Auto-open ticket from notification

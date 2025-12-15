@@ -93,14 +93,30 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
   const [responseMessage, setResponseMessage] = useState('');
 
   useEffect(() => {
-    loadNotifications();
-    
-    // Auto-refresh mỗi 10 giây
-    const intervalId = setInterval(() => {
-      loadNotifications();
-    }, 10000);
-    
-    return () => clearInterval(intervalId);
+    setLoading(true);
+    const notificationsRef = ref(database, 'admin_notifications');
+    const notificationsQuery = query(notificationsRef, orderByChild('createdAt'), limitToLast(100));
+
+    // Real-time listener - tự động cập nhật khi có thông báo mới
+    const unsubscribe = onValue(notificationsQuery, (snapshot) => {
+      if (snapshot.exists()) {
+        const notificationsData: AdminNotification[] = [];
+        snapshot.forEach((child) => {
+          notificationsData.push({
+            id: child.key!,
+            ...child.val()
+          });
+        });
+        // Sort by createdAt descending (newest first)
+        notificationsData.sort((a, b) => b.createdAt - a.createdAt);
+        setNotifications(notificationsData);
+      } else {
+        setNotifications([]);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const loadNotifications = () => {
@@ -189,11 +205,24 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
   };
 
   const handleActionClick = (notification: AdminNotification) => {
+    console.log('[handleActionClick] Notification data:', notification);
+    
     // Xử lý các loại notification khác nhau
-    if (notification.type === 'USER_FEEDBACK' && notification.data?.ticketId) {
-      // Mở support với ticketId để hiển thị chat ngay
-      router.push(`/support?ticketId=${notification.data.ticketId}`);
+    if (notification.type === 'USER_FEEDBACK') {
+      // Lấy ticketId từ data
+      const ticketId = notification.data?.ticketId;
+      console.log('[handleActionClick] ticketId:', ticketId);
+      
+      if (ticketId) {
+        // Mở support với ticketId để hiển thị chat ngay
+        console.log('[handleActionClick] Navigating to /support?ticketId=' + ticketId);
+        router.push(`/support?ticketId=${ticketId}`);
+      } else {
+        console.error('[handleActionClick] No ticketId found in notification data');
+        toast.error('Không tìm thấy ticket ID');
+      }
     } else if (notification.actionUrl) {
+      console.log('[handleActionClick] Using actionUrl:', notification.actionUrl);
       router.push(notification.actionUrl);
     }
   };
@@ -546,10 +575,20 @@ export default function AdminNotificationsPage({ darkMode, toggleDarkMode }: Adm
                           </Box>
                         }
                         onClick={() => {
+                          console.log('[NotificationItem] Clicked notification:', notification);
                           // Nếu là USER_FEEDBACK và có ticketId, mở support luôn
-                          if (notification.type === 'USER_FEEDBACK' && notification.data?.ticketId) {
-                            handleMarkAsRead(notification.id, true);
-                            router.push(`/support?ticketId=${notification.data.ticketId}`);
+                          if (notification.type === 'USER_FEEDBACK') {
+                            const ticketId = notification.data?.ticketId;
+                            console.log('[NotificationItem] ticketId:', ticketId);
+                            
+                            if (ticketId) {
+                              handleMarkAsRead(notification.id, true);
+                              console.log('[NotificationItem] Navigating to /support?ticketId=' + ticketId);
+                              router.push(`/support?ticketId=${ticketId}`);
+                            } else {
+                              console.error('[NotificationItem] No ticketId found');
+                              handleViewDetails(notification);
+                            }
                           } else {
                             handleViewDetails(notification);
                           }
