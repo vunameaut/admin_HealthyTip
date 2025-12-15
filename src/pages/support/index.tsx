@@ -210,11 +210,12 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
         
         // Update local state ngay lập tức để UI phản hồi nhanh
         setTickets(prevTickets => 
-          prevTickets.map(t => 
-            t.id === ticket.id 
-              ? { ...t, hasUnreadUserMessage: false, lastUserMessageAt: null } as SupportTicket
-              : t
-          )
+          prevTickets.map(t => {
+            if (t.id === ticket.id) {
+              return { ...t, hasUnreadUserMessage: false, lastUserMessageAt: undefined };
+            }
+            return t;
+          })
         );
         console.log('[Support] Unread flag cleared successfully');
       } catch (error) {
