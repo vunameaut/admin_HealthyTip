@@ -55,45 +55,61 @@ export default async function handler(
       if (fcmToken) {
         console.log(`[send-to-user] FCM token found for user ${userId}: ${fcmToken.substring(0, 20)}...`);
         
-        const messaging = getMessaging();
-        
-        // ✅ CRITICAL: Gửi notification + data payload
-        // Notification payload đảm bảo hiển thị khi app ở background
-        // Data payload để app xử lý khi ở foreground
-        const message = {
-          notification: {
-            title: title,
-            body: body,
-          },
-          data: {
-            type: data?.type || 'ADMIN_REPLY',
-            reportId: (data?.reportId || '').toString(),
-            report_id: (data?.reportId || '').toString(), // Backup key
-            title: title.toString(),
-            body: body.toString(),
-            timestamp: Date.now().toString(),
-          },
-          token: fcmToken,
-          android: {
-            priority: 'high' as const,
+        try {
+          const messaging = getMessaging();
+          console.log('[send-to-user] Messaging instance obtained');
+          
+          // ✅ SIMPLE: Chỉ gửi notification giống như Firebase Console test
+          // Đảm bảo hiển thị notification trên tất cả trạng thái app
+          const message = {
             notification: {
-              sound: 'default',
-              clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+              title: title,
+              body: body,
             },
-          },
-        };
+            data: {
+              type: data?.type || 'ADMIN_REPLY',
+              reportId: (data?.reportId || '').toString(),
+              report_id: (data?.reportId || '').toString(),
+              title: title.toString(),
+              body: body.toString(),
+            },
+            token: fcmToken,
+            android: {
+              priority: 'high' as const,
+            },
+          };
 
-        console.log(`[send-to-user] Sending FCM with notification + data payload to user ${userId}`);
-        console.log(`[send-to-user] Message:`, JSON.stringify(message, null, 2));
-        
-        const response = await messaging.send(message);
-        console.log(`[send-to-user] FCM push sent successfully. Message ID: ${response}`);
+          console.log(`[send-to-user] Attempting to send FCM message`);
+          console.log(`[send-to-user] Token: ${fcmToken.substring(0, 30)}...`);
+          console.log(`[send-to-user] Message structure:`, {
+            hasNotification: !!message.notification,
+            hasData: !!message.data,
+            dataKeys: Object.keys(message.data),
+          });
+          
+          const response = await messaging.send(message);
+          console.log(`[send-to-user] ✅ FCM sent successfully! Message ID: ${response}`);
 
-        return res.status(200).json({
-          success: true,
-          message: 'Notification sent successfully',
-          pushSent: true,
-        });
+          return res.status(200).json({
+            success: true,
+            message: 'Notification sent successfully',
+            pushSent: true,
+            messageId: response,
+            fcmTokenPreview: fcmToken.substring(0, 20) + '...',
+          });
+        } catch (fcmSendError: any) {
+          console.error('[send-to-user] ❌ FCM send failed:', fcmSendError);
+          console.error('[send-to-user] Error code:', fcmSendError.code);
+          console.error('[send-to-user] Error message:', fcmSendError.message);
+          
+          return res.status(200).json({
+            success: true,
+            message: 'Notification saved but FCM send failed',
+            pushSent: false,
+            error: fcmSendError.message,
+            errorCode: fcmSendError.code,
+          });
+        }
       } else {
         console.log(`[API] No FCM token found for user: ${userId}`);
         return res.status(200).json({
@@ -102,17 +118,6 @@ export default async function handler(
           pushSent: false,
         });
       }
-    } catch (fcmError: any) {
-      console.error('[API] FCM send error:', fcmError);
-      // Still return success because notification was saved
-      return res.status(200).json({
-        success: true,
-        message: 'Notification saved, FCM send failed',
-        pushSent: false,
-        fcmError: fcmError.message,
-      });
-    }
-
   } catch (error: any) {
     console.error('[send-to-user] Error sending user notification:', error);
     console.error('[send-to-user] Error stack:', error.stack);
