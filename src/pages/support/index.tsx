@@ -47,7 +47,7 @@ import { supportService } from '../../services/firebase';
 import { SupportTicket, SupportMessage } from '../../types';
 import toast from 'react-hot-toast';
 import { auth, database } from '../../lib/firebase';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, update, query, orderByChild, equalTo, get } from 'firebase/database';
 import { useRouter } from 'next/router';
 
 interface SupportStats {
@@ -276,6 +276,38 @@ export default function SupportManagement({ darkMode, toggleDarkMode }: SupportM
       setMessageText('');
       await loadMessages();
       await loadData(); // Refresh ticket list
+      
+      // Mark related admin notification as resolved
+      try {
+        const notificationsRef = ref(database, 'admin_notifications');
+        const notificationQuery = query(
+          notificationsRef,
+          orderByChild('data/ticketId'),
+          equalTo(selectedTicket.id)
+        );
+        
+        const snapshot = await get(notificationQuery);
+        if (snapshot.exists()) {
+          const updates: any = {};
+          snapshot.forEach((child) => {
+            const notification = child.val();
+            // Chỉ mark resolved nếu là USER_FEEDBACK và chưa resolved
+            if (notification.type === 'USER_FEEDBACK' && !notification.resolved) {
+              updates[`admin_notifications/${child.key}/resolved`] = true;
+              updates[`admin_notifications/${child.key}/read`] = true;
+            }
+          });
+          
+          if (Object.keys(updates).length > 0) {
+            await update(ref(database), updates);
+            console.log('[Support] Marked related notifications as resolved');
+          }
+        }
+      } catch (notifError) {
+        console.error('Error marking notification as resolved:', notifError);
+        // Don't fail if this fails
+      }
+      
       toast.success('Đã gửi tin nhắn');
     } catch (error) {
       console.error('Error sending message:', error);
