@@ -161,34 +161,13 @@ export default function DashboardLayout({
         toast.error('Không tìm thấy reportId trong thông báo');
       }
     }
-    // USER_REPORT: Kiểm tra xem có reportType không
+    // USER_REPORT: Notification về báo cáo nội dung/lỗi/spam (không phải report chat)
+    // Navigate đến trang admin notifications để xem chi tiết
     else if (notification.type === 'USER_REPORT') {
-      // Nếu có reportType trong data -> đây là báo cáo nội dung/lỗi/spam
-      // Navigate đến trang admin notifications
-      if (notification.data?.reportType) {
-        console.log('📝 Content/Bug report - navigate to admin notifications');
-        router.push('/admin-notifications');
-        handleNotificationClose();
-        return;
-      }
-      // Nếu KHÔNG có reportType -> có thể là report chat được tạo từ mobile
-      // Thử dùng notification.id làm reportId
-      else {
-        const reportId = notification.reportId || notification.data?.reportId || notification.id;
-        console.log('💬 USER_REPORT without reportType - try as chat report. ReportId:', reportId);
-        
-        if (reportId) {
-          console.log('🚀 Navigating to /reports/' + reportId);
-          router.push(`/reports/${reportId}`);
-          handleNotificationClose();
-          return;
-        } else {
-          console.error('❌ Cannot determine routing for USER_REPORT');
-          router.push('/admin-notifications');
-          handleNotificationClose();
-          return;
-        }
-      }
+      console.log('� User report notification - navigate to admin notifications');
+      router.push('/admin-notifications');
+      handleNotificationClose();
+      return;
     } 
     // Support/Ticket system cũ
     else if (notification.data?.reportId) {

@@ -118,6 +118,13 @@ export default function ReportDetailPage() {
       setLoading(false);
       if (snapshot.exists()) {
         setReport({ id: snapshot.key!, ...snapshot.val() });
+        
+        // ✅ Đánh dấu đã đọc tin nhắn từ user khi admin mở report
+        if (snapshot.val().hasUnreadUserMessage) {
+          update(reportRef, {
+            hasUnreadUserMessage: false,
+          }).catch(err => console.error('Error clearing unread flag:', err));
+        }
       } else {
         setError('Không tìm thấy báo cáo');
       }

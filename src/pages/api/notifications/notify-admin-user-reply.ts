@@ -1,0 +1,76 @@
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getDatabase } from '@/lib/firebaseAdmin';
+
+/**
+ * API endpoint để gửi thông báo cho admin khi user reply trong report chat
+ * POST /api/notifications/notify-admin-user-reply
+ * 
+ * Request body:
+ * - reportId: ID của report
+ * - userId: ID của user gửi tin nhắn
+ * - userName: Tên user
+ * - messageText: Nội dung tin nhắn
+ */
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { reportId, userId, userName, messageText } = req.body;
+
+    // Validate required fields
+    if (!reportId || !userId || !userName || !messageText) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: reportId, userId, userName, messageText' 
+      });
+    }
+
+    // Get Firebase Admin Database
+    const db = getDatabase();
+
+    // Tạo admin notification trong Firebase
+    const adminNotificationsRef = db.ref('admin_notifications');
+    const notification = {
+      type: 'USER_REPLY',
+      reportId,
+      userId,
+      userName,
+      messagePreview: messageText.substring(0, 100),
+      messageText: messageText.substring(0, 200), // Lưu preview dài hơn
+      read: false,
+      createdAt: Date.now(),
+      timestamp: Date.now(),
+    };
+
+    const newNotificationRef = await adminNotificationsRef.push(notification);
+    console.log(`[API] Admin notification created: ${newNotificationRef.key}`);
+
+    // Cập nhật report để đánh dấu có tin nhắn chưa đọc từ user
+    const reportRef = db.ref(`reports/${reportId}`);
+    await reportRef.update({
+      hasUnreadUserMessage: true,
+      lastUserMessageAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    console.log(`[API] Report ${reportId} marked as having unread user message`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Admin notification created successfully',
+      notificationId: newNotificationRef.key,
+    });
+
+  } catch (error: any) {
+    console.error('[API] Error creating admin notification:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      details: error.message,
+    });
+  }
+}

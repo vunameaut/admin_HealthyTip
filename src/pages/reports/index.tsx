@@ -35,6 +35,7 @@ import {
   MoreHoriz as OtherIcon,
   Refresh as RefreshIcon,
   FilterList as FilterIcon,
+  FiberManualRecord as UnreadIcon,
 } from '@mui/icons-material';
 import { ref, get, onValue, off, query, orderByChild } from 'firebase/database';
 import { database } from '@/lib/firebase';
@@ -57,6 +58,8 @@ interface Report {
   lastMessageAt?: number;
   lastMessagePreview?: string;
   deviceInfo?: string;
+  hasUnreadUserMessage?: boolean; // NEW: Flag để đánh dấu có tin nhắn chưa đọc từ user
+  lastUserMessageAt?: number; // NEW: Timestamp của tin nhắn cuối từ user
 }
 
 interface ReportStats {
@@ -375,13 +378,31 @@ export default function ReportsPage() {
                       <TableRow
                         key={report.id}
                         hover
-                        sx={{ cursor: 'pointer' }}
+                        sx={{ 
+                          cursor: 'pointer',
+                          bgcolor: report.hasUnreadUserMessage ? 'action.hover' : 'inherit',
+                        }}
                         onClick={() => handleViewReport(report.id)}
                       >
                         <TableCell>
-                          <Typography variant="body2" fontFamily="monospace">
-                            {report.id.substring(0, 8).toUpperCase()}
-                          </Typography>
+                          <Box display="flex" alignItems="center" gap={1}>
+                            {report.hasUnreadUserMessage && (
+                              <UnreadIcon 
+                                sx={{ 
+                                  fontSize: 12, 
+                                  color: 'error.main',
+                                  animation: 'pulse 1.5s ease-in-out infinite',
+                                  '@keyframes pulse': {
+                                    '0%, 100%': { opacity: 1 },
+                                    '50%': { opacity: 0.5 },
+                                  },
+                                }} 
+                              />
+                            )}
+                            <Typography variant="body2" fontFamily="monospace">
+                              {report.id.substring(0, 8).toUpperCase()}
+                            </Typography>
+                          </Box>
                         </TableCell>
                         <TableCell>
                           <Chip
@@ -431,6 +452,15 @@ export default function ReportsPage() {
                             color={statusConfig[report.status]?.color || 'default'}
                             size="small"
                           />
+                          {report.hasUnreadUserMessage && (
+                            <Chip
+                              label="Tin nhắn mới"
+                              size="small"
+                              color="error"
+                              variant="outlined"
+                              sx={{ ml: 0.5 }}
+                            />
+                          )}
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
