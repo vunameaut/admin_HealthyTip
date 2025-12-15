@@ -118,6 +118,16 @@ export default async function handler(
           pushSent: false,
         });
       }
+    } catch (innerError: any) {
+      console.error('[send-to-user] Error getting FCM token:', innerError);
+      return res.status(200).json({
+        success: true,
+        message: 'Notification saved, but failed to get FCM token',
+        pushSent: false,
+        error: innerError.message,
+      });
+    }
+
   } catch (error: any) {
     console.error('[send-to-user] Error sending user notification:', error);
     console.error('[send-to-user] Error stack:', error.stack);
