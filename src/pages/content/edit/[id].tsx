@@ -34,10 +34,12 @@ import {
   ArrowUpward,
   ArrowDownward,
   TextFields,
-  FormatQuote
+  FormatQuote,
+  Visibility
 } from '@mui/icons-material';
 import LayoutWrapper from '../../../components/LayoutWrapper';
 import AuthGuard, { useCurrentUser } from '../../../components/AuthGuard';
+import ContentPreview from '../../../components/ContentPreview';
 import { healthTipsService, categoriesService } from '../../../services/firebase';
 import { HealthTip } from '../../../types';
 import toast from 'react-hot-toast';
@@ -79,6 +81,7 @@ const [videoUrl, setVideoUrl] = useState('');
   const [isFeature, setIsFeature] = useState(false);
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
   const [newTag, setNewTag] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (currentUser && !userLoading && id) {
@@ -517,6 +520,14 @@ const [videoUrl, setVideoUrl] = useState('');
                 disabled={saving}
               >
                 Hủy
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<Visibility />}
+                onClick={() => setPreviewOpen(true)}
+                disabled={saving}
+              >
+                Xem trước
               </Button>
               <Button
                 variant="contained"
@@ -1054,6 +1065,28 @@ const [videoUrl, setVideoUrl] = useState('');
               </Stack>
             </Grid>
           </Grid>
+
+          {/* Preview Dialog */}
+          <ContentPreview
+            open={previewOpen}
+            onClose={() => setPreviewOpen(false)}
+            title={title}
+            content={blocks.map(block => ({
+              type: block.type,
+              content: block.value,
+              metadata: block.metadata
+            }))}
+            category={categories.find(c => c.id === category)?.name}
+            tags={tags}
+            author={author}
+            imageUrl={imageUrl}
+            videoUrl={videoUrl}
+            isFeature={isFeature}
+            status={status}
+            createdAt={healthTip?.createdAt}
+            viewCount={healthTip?.viewCount}
+            likeCount={healthTip?.likeCount}
+          />
         </Box>
       </LayoutWrapper>
     </AuthGuard>

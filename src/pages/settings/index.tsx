@@ -56,6 +56,8 @@ import {
 } from '@mui/icons-material';
 import LayoutWrapper from '../../components/LayoutWrapper';
 import AuthGuard from '../../components/AuthGuard';
+import { database } from '@/lib/firebase';
+import { ref, get, set } from 'firebase/database';
 import toast from 'react-hot-toast';
 
 interface SystemConfig {
@@ -194,13 +196,32 @@ export default function SystemSettings({ darkMode, toggleDarkMode }: SystemSetti
   const loadSystemConfig = async () => {
     try {
       setLoading(true);
-      // Load configuration from Firebase or local storage
-      const savedConfig = localStorage.getItem('systemConfig');
-      if (savedConfig) {
-        setConfig({ ...config, ...JSON.parse(savedConfig) });
+      
+      // Try to load from Firebase first
+      const configRef = ref(database, 'system_config');
+      const snapshot = await get(configRef);
+      
+      if (snapshot.exists()) {
+        const savedConfig = snapshot.val();
+        setConfig(prev => ({ ...prev, ...savedConfig }));
+      } else {
+        // Fallback to localStorage
+        const savedConfig = localStorage.getItem('systemConfig');
+        if (savedConfig) {
+          setConfig(prev => ({ ...prev, ...JSON.parse(savedConfig) }));
+        }
       }
     } catch (error) {
       console.error('Error loading system config:', error);
+      // Try localStorage as fallback
+      const savedConfig = localStorage.getItem('systemConfig');
+      if (savedConfig) {
+        try {
+          setConfig(prev => ({ ...prev, ...JSON.parse(savedConfig) }));
+        } catch (e) {
+          console.error('Error parsing localStorage config:', e);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -209,11 +230,15 @@ export default function SystemSettings({ darkMode, toggleDarkMode }: SystemSetti
   const saveSystemConfig = async () => {
     try {
       setLoading(true);
-      // Save to Firebase and local storage
-      localStorage.setItem('systemConfig', JSON.stringify(config));
       
-      // Here you would also save to Firebase
-      // await systemConfigService.save(config);
+      // Save to both Firebase and localStorage
+      const configRef = ref(database, 'system_config');
+      await set(configRef, {
+        ...config,
+        lastUpdated: Date.now(),
+      });
+      
+      localStorage.setItem('systemConfig', JSON.stringify(config));
       
       toast.success('Đã lưu cấu hình hệ thống');
     } catch (error) {

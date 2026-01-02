@@ -56,6 +56,7 @@ import {
 import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import LayoutWrapper from '../../components/LayoutWrapper';
 import AuthGuard from '../../components/AuthGuard';
+import ContentPreview from '../../components/ContentPreview';
 import { healthTipsService, categoriesService, analyticsService } from '../../services/firebase';
 import { HealthTip, Category, FilterOptions } from '../../types';
 import toast from 'react-hot-toast';
@@ -75,6 +76,8 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
   const [bulkActionMenuAnchor, setBulkActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [filters, setFilters] = useState<FilterOptions>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewContent, setPreviewContent] = useState<HealthTip | null>(null);
 
   useEffect(() => {
     loadData();
@@ -92,8 +95,11 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
       if (searchQuery) {
         filteredTips = tips.filter(tip => {
           const contentString = Array.isArray(tip.content)
-            ? tip.content.filter(block => block.type === 'text').map(block => block.value).join(' ')
-            : tip.content;
+            ? tip.content
+                .filter(block => block.type === 'text' && block.value && typeof block.value === 'string')
+                .map(block => block.value)
+                .join(' ')
+            : (typeof tip.content === 'string' ? tip.content : '');
           return tip.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                  contentString.toLowerCase().includes(searchQuery.toLowerCase());
         });
@@ -176,6 +182,11 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
       console.error('Error toggling feature status:', error);
       toast.error('Có lỗi xảy ra');
     }
+  };
+
+  const handlePreview = (healthTip: HealthTip) => {
+    setPreviewContent(healthTip);
+    setPreviewOpen(true);
   };
 
   const exportData = () => {
@@ -355,10 +366,15 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
     {
       field: 'actions',
       headerName: 'Thao tác',
-      width: 120,
+      width: 160,
       sortable: false,
       renderCell: (params) => (
         <Box>
+          <Tooltip title="Xem trước">
+            <IconButton size="small" onClick={() => handlePreview(params.row)}>
+              <Visibility fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Chỉnh sửa">
             <IconButton size="small" onClick={() => router.push(`/content/edit/${params.row.id}`)}>
               <Edit fontSize="small" />
@@ -567,6 +583,31 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
             style={{ display: 'none' }}
             onChange={handleImportFile}
           />
+
+          {/* Preview Dialog */}
+          {previewContent && (
+            <ContentPreview
+              open={previewOpen}
+              onClose={() => setPreviewOpen(false)}
+              title={previewContent.title}
+              content={
+                Array.isArray(previewContent.contentBlocks) 
+                  ? previewContent.contentBlocks 
+                  : Array.isArray(previewContent.content) 
+                    ? previewContent.content 
+                    : []
+              }
+              category={categories.find(c => c.id === previewContent.categoryId)?.name}
+              tags={previewContent.tags}
+              author={previewContent.author}
+              imageUrl={previewContent.imageUrl}
+              isFeature={previewContent.isFeature}
+              status={previewContent.status}
+              createdAt={previewContent.createdAt}
+              viewCount={previewContent.viewCount}
+              likeCount={previewContent.likeCount}
+            />
+          )}
         </Box>
       </LayoutWrapper>
     </AuthGuard>

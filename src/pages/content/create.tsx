@@ -28,12 +28,14 @@ import {
   ArrowUpward,
   ArrowDownward,
   TextFields,
-  Image
+  Image,
+  Visibility
 } from '@mui/icons-material';
 import LayoutWrapper from '../../components/LayoutWrapper';
 import AuthGuard, { useCurrentUser } from '../../components/AuthGuard';
 import RichContentEditor, { ContentBlock } from '../../components/RichContentEditor';
 import MediaUploadForm from '../../components/MediaUploadForm';
+import ContentPreview from '../../components/ContentPreview';
 import { healthTipsService, categoriesService } from '../../services/firebase';
 import { HealthTip, Media } from '../../types';
 import toast from 'react-hot-toast';
@@ -62,6 +64,7 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
   const [uploadedMedia, setUploadedMedia] = useState<Media[]>([]);
   const [showMediaUpload, setShowMediaUpload] = useState(false);
   const [sendNotification, setSendNotification] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     loadCategories();
@@ -237,6 +240,14 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
                 disabled={saving}
               >
                 Hủy
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<Visibility />}
+                onClick={() => setPreviewOpen(true)}
+                disabled={saving}
+              >
+                Xem trước
               </Button>
               <Button
                 variant="contained"
@@ -425,6 +436,19 @@ export default function CreateHealthTipPage({ darkMode, toggleDarkMode }: Create
               </Stack>
             </Grid>
           </Grid>
+
+          {/* Preview Dialog */}
+          <ContentPreview
+            open={previewOpen}
+            onClose={() => setPreviewOpen(false)}
+            title={title}
+            content={content}
+            category={categories.find(c => c.id === category)?.name}
+            tags={tags}
+            author={currentUser?.displayName || 'Admin'}
+            isFeature={isFeature}
+            status={status}
+          />
         </Box>
       </LayoutWrapper>
     </AuthGuard>

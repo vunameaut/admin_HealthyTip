@@ -122,11 +122,12 @@ export default function SearchPage({ darkMode, toggleDarkMode }: SearchPageProps
           // Check content - handle both string and array
           let contentMatch = false;
           if (Array.isArray(post.content)) {
-            contentMatch = post.content.some(block =>
-              typeof block === 'object' && block.value
-                ? block.value.toLowerCase().includes(query)
-                : false
-            );
+            contentMatch = post.content.some(block => {
+              if (typeof block === 'object' && block.value && typeof block.value === 'string') {
+                return block.value.toLowerCase().includes(query);
+              }
+              return false;
+            });
           } else if (typeof post.content === 'string') {
             contentMatch = post.content.toLowerCase().includes(query);
           }

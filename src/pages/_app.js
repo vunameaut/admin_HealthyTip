@@ -4,14 +4,20 @@ import CssBaseline from '@mui/material/CssBaseline'
 import { Toaster } from 'react-hot-toast'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
-import { vi } from 'date-fns/locale'
+import { vi, enUS } from 'date-fns/locale'
+import { LanguageProvider } from '../contexts/LanguageContext'
 
 export default function App({ Component, pageProps }) {
+  const [currentLocale, setCurrentLocale] = useState(vi)
   const [darkMode, setDarkMode] = useState(false)
   const [systemThemeDetected, setSystemThemeDetected] = useState(false)
 
   // Auto-detect system theme preference
   useEffect(() => {
+    // Check language
+    const savedLang = localStorage.getItem('app_language') || 'vi'
+    setCurrentLocale(savedLang === 'vi' ? vi : enUS)
+    
     // Check if user has saved preference
     const savedTheme = localStorage.getItem('healthtips-admin-theme')
     
@@ -108,20 +114,22 @@ export default function App({ Component, pageProps }) {
   }
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={vi}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Component {...pageProps} darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: darkMode ? '#333' : '#fff',
-              color: darkMode ? '#fff' : '#000',
-            },
-          }}
-        />
-      </ThemeProvider>
-    </LocalizationProvider>
+    <LanguageProvider>
+      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={currentLocale}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Component {...pageProps} darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: darkMode ? '#333' : '#fff',
+                color: darkMode ? '#fff' : '#000',
+              },
+            }}
+          />
+        </ThemeProvider>
+      </LocalizationProvider>
+    </LanguageProvider>
   )
 }

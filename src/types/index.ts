@@ -4,6 +4,10 @@ export interface User {
   displayName: string;
   photoUrl?: string;
   phoneNumber?: string;
+  phone?: string;
+  bio?: string;
+  location?: string;
+  verified?: boolean;
   createdAt: number;
   lastLoginAt: number;
   lastSeen?: number;
@@ -12,6 +16,7 @@ export interface User {
   favoriteHealthTips?: Record<string, boolean>;
   likedHealthTips?: Record<string, boolean>;
   role?: 'admin' | 'editor' | 'moderator' | 'analyst' | 'viewer';
+  updatedAt?: number;
 }
 
 export interface ContentBlock {
