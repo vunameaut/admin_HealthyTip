@@ -293,6 +293,14 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
     thumbnailType: 'auto' as 'auto' | 'url',
   });
   const [thumbnailError, setThumbnailError] = useState('');
+  const [boostStatsDialogOpen, setBoostStatsDialogOpen] = useState(false);
+  const [boostStatsData, setBoostStatsData] = useState({
+    viewsMin: 2000,
+    viewsMax: 9999,
+    likesMin: 2000,
+    likesMax: 9999,
+    applyToAll: false
+  });
 
   useEffect(() => {
     loadData();
@@ -640,6 +648,51 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
     }
   };
 
+  const handleBoostStats = async () => {
+    try {
+      setLoading(true);
+      const videosToBoost = boostStatsData.applyToAll 
+        ? videos 
+        : videos.filter(video => selectedRows.includes(video.id));
+
+      if (videosToBoost.length === 0) {
+        toast.error('Vui lòng chọn ít nhất một video hoặc áp dụng cho tất cả');
+        return;
+      }
+
+      const { viewsMin, viewsMax, likesMin, likesMax } = boostStatsData;
+
+      for (const video of videosToBoost) {
+        const randomViews = Math.floor(Math.random() * (viewsMax - viewsMin + 1)) + viewsMin;
+        const randomLikes = Math.floor(Math.random() * (likesMax - likesMin + 1)) + likesMin;
+        
+        const currentViews = video.viewCount || 0;
+        const currentLikes = video.likeCount || 0;
+
+        await videosService.update(video.id, {
+          viewCount: currentViews + randomViews,
+          likeCount: currentLikes + randomLikes
+        });
+      }
+
+      toast.success(`Đã tăng views/likes cho ${videosToBoost.length} video thành công!`);
+      setBoostStatsDialogOpen(false);
+      setBoostStatsData({
+        viewsMin: 2000,
+        viewsMax: 9999,
+        likesMin: 2000,
+        likesMax: 9999,
+        applyToAll: false
+      });
+      loadData();
+    } catch (error) {
+      console.error('Error boosting stats:', error);
+      toast.error('Có lỗi xảy ra khi tăng views/likes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Export all videos data
   const exportVideoData = () => {
     try {
@@ -974,6 +1027,14 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                 Làm mới
               </Button>
               <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<TrendingUp />}
+                onClick={() => setBoostStatsDialogOpen(true)}
+              >
+                Tăng Views/Likes
+              </Button>
+              <Button
                 variant="contained"
                 startIcon={<Add />}
                 onClick={() => setUploadDialogOpen(true)}
@@ -1111,6 +1172,15 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                     onClick={handleBulkExport}
                   >
                     Export
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="secondary"
+                    startIcon={<TrendingUp />}
+                    onClick={() => setBoostStatsDialogOpen(true)}
+                  >
+                    Tăng Stats
                   </Button>
                   <Button
                     variant="outlined"
@@ -1497,6 +1567,145 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                 onClick={() => userToBan && handleBanUser(userToBan)}
               >
                 Ban User
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Boost Stats Dialog */}
+          <Dialog
+            open={boostStatsDialogOpen}
+            onClose={() => setBoostStatsDialogOpen(false)}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>
+              <Box display="flex" alignItems="center" gap={1}>
+                <TrendingUp color="secondary" />
+                Tăng Views và Likes cho Video
+              </Box>
+            </DialogTitle>
+            <DialogContent>
+              <Box sx={{ mt: 2 }}>
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  {boostStatsData.applyToAll 
+                    ? `Sẽ áp dụng cho TẤT CẢ ${videos.length} video` 
+                    : selectedRows.length > 0 
+                      ? `Sẽ áp dụng cho ${selectedRows.length} video đã chọn`
+                      : 'Vui lòng chọn video hoặc áp dụng cho tất cả'}
+                </Alert>
+
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Views (Lượt xem)
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Tối thiểu"
+                      value={boostStatsData.viewsMin}
+                      onChange={(e) => setBoostStatsData({ 
+                        ...boostStatsData, 
+                        viewsMin: parseInt(e.target.value) || 0 
+                      })}
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Tối đa"
+                      value={boostStatsData.viewsMax}
+                      onChange={(e) => setBoostStatsData({ 
+                        ...boostStatsData, 
+                        viewsMax: parseInt(e.target.value) || 0 
+                      })}
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sx={{ mt: 2 }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      Likes (Lượt thích)
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Tối thiểu"
+                      value={boostStatsData.likesMin}
+                      onChange={(e) => setBoostStatsData({ 
+                        ...boostStatsData, 
+                        likesMin: parseInt(e.target.value) || 0 
+                      })}
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Tối đa"
+                      value={boostStatsData.likesMax}
+                      onChange={(e) => setBoostStatsData({ 
+                        ...boostStatsData, 
+                        likesMax: parseInt(e.target.value) || 0 
+                      })}
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Box sx={{ 
+                      mt: 2, 
+                      p: 2, 
+                      bgcolor: 'action.hover', 
+                      borderRadius: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Typography variant="body2">
+                        Áp dụng cho tất cả video
+                      </Typography>
+                      <Button
+                        variant={boostStatsData.applyToAll ? 'contained' : 'outlined'}
+                        size="small"
+                        onClick={() => setBoostStatsData({ 
+                          ...boostStatsData, 
+                          applyToAll: !boostStatsData.applyToAll 
+                        })}
+                      >
+                        {boostStatsData.applyToAll ? 'Đã bật' : 'Tắt'}
+                      </Button>
+                    </Box>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Alert severity="warning" sx={{ mt: 2 }}>
+                      Mỗi video sẽ được tăng một số lượng ngẫu nhiên trong khoảng bạn đã chọn.
+                      Số liệu sẽ được <strong>CỘNG THÊM</strong> vào số liệu hiện tại của video.
+                    </Alert>
+                  </Grid>
+                </Grid>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setBoostStatsDialogOpen(false)}>
+                Hủy
+              </Button>
+              <Button 
+                variant="contained" 
+                color="secondary"
+                startIcon={<TrendingUp />}
+                onClick={handleBoostStats}
+                disabled={loading || (!boostStatsData.applyToAll && selectedRows.length === 0)}
+              >
+                {loading ? 'Đang xử lý...' : 'Tăng Stats'}
               </Button>
             </DialogActions>
           </Dialog>
