@@ -30,7 +30,8 @@ import {
   Delete,
   Add,
   Save,
-  Cancel
+  Cancel,
+  Image
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import { Category } from '../types';
@@ -42,6 +43,8 @@ interface VideoFormData {
   categoryId: string;
   status: 'draft' | 'published';
   tags: string;
+  thumbnailUrl: string;
+  thumbnailType: 'auto' | 'url';
 }
 
 interface VideoUploadFormProps {
@@ -71,8 +74,11 @@ export default function VideoUploadForm({
     caption: '',
     categoryId: categories.length > 0 ? categories[0].id : '',
     status: 'draft',
-    tags: ''
+    tags: '',
+    thumbnailUrl: '',
+    thumbnailType: 'auto'
   });
+  const [thumbnailError, setThumbnailError] = useState('');
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const videoFiles = acceptedFiles.filter(file => {
@@ -148,8 +154,11 @@ export default function VideoUploadForm({
         caption: '',
         categoryId: categories.length > 0 ? categories[0].id : '',
         status: 'draft',
-        tags: ''
+        tags: '',
+        thumbnailUrl: '',
+        thumbnailType: 'auto'
       });
+      setThumbnailError('');
       onClose();
     }
   };
@@ -330,6 +339,81 @@ export default function VideoUploadForm({
               placeholder="suckhoe, dinhduong, thethanh"
               helperText="Phân cách bằng dấu phẩy. Ví dụ: suckhoe, dinhduong, thethanh"
             />
+          </Grid>
+
+          {/* Thumbnail Section */}
+          <Grid item xs={12}>
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Image color="primary" />
+                <Typography variant="h6">Thumbnail</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  (Không bắt buộc)
+                </Typography>
+              </Box>
+
+              <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+                <Button
+                  variant={formData.thumbnailType === 'auto' ? 'contained' : 'outlined'}
+                  onClick={() => setFormData(prev => ({ ...prev, thumbnailType: 'auto', thumbnailUrl: '' }))}
+                  size="small"
+                >
+                  Tự động từ video
+                </Button>
+                <Button
+                  variant={formData.thumbnailType === 'url' ? 'contained' : 'outlined'}
+                  onClick={() => setFormData(prev => ({ ...prev, thumbnailType: 'url' }))}
+                  size="small"
+                >
+                  Nhập link ảnh
+                </Button>
+              </Stack>
+
+              {formData.thumbnailType === 'auto' && (
+                <Alert severity="info">
+                  Thumbnail sẽ tự động được tạo từ video khi upload lên
+                </Alert>
+              )}
+
+              {formData.thumbnailType === 'url' && (
+                <Box>
+                  <TextField
+                    fullWidth
+                    label="Link ảnh thumbnail"
+                    value={formData.thumbnailUrl}
+                    onChange={(e) => {
+                      const url = e.target.value;
+                      setFormData(prev => ({ ...prev, thumbnailUrl: url }));
+                      setThumbnailError('');
+                    }}
+                    placeholder="https://example.com/thumbnail.jpg"
+                    error={!!thumbnailError}
+                    helperText={thumbnailError || 'Nhập link ảnh thumbnail cho video'}
+                  />
+                  
+                  {formData.thumbnailUrl && !thumbnailError && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="body2" gutterBottom>
+                        Preview:
+                      </Typography>
+                      <Box
+                        component="img"
+                        src={formData.thumbnailUrl}
+                        alt="Thumbnail preview"
+                        sx={{
+                          maxWidth: 200,
+                          maxHeight: 150,
+                          borderRadius: 1,
+                          border: '1px solid',
+                          borderColor: 'divider'
+                        }}
+                        onError={() => setThumbnailError('Không thể tải ảnh từ link này')}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Box>
           </Grid>
 
           {/* Upload Progress */}

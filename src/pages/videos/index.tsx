@@ -289,7 +289,10 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
     categoryId: '',
     status: 'draft',
     tags: '',
+    thumbnailUrl: '',
+    thumbnailType: 'auto' as 'auto' | 'url',
   });
+  const [thumbnailError, setThumbnailError] = useState('');
 
   useEffect(() => {
     loadData();
@@ -349,7 +352,10 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
       categoryId: categories.length > 0 ? categories[0].id : '',
       status: 'draft',
       tags: '',
+      thumbnailUrl: '',
+      thumbnailType: 'auto',
     });
+    setThumbnailError('');
   };
 
   const handleVideoUpload = async () => {
@@ -384,9 +390,37 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
               setUploadProgress(totalProgress);
             }
           });
+          
+          console.log('Upload result:', uploadResult);
+          console.log('Thumbnail type:', newVideoData.thumbnailType);
+          console.log('Custom thumbnail URL:', newVideoData.thumbnailUrl);
 
           // Create video record in Firebase
-          const thumbnailUrl = uploadResult.thumbnail_url || '';
+          // Determine thumbnail URL based on user selection
+          let thumbnailUrl = '';
+          if (newVideoData.thumbnailType === 'url' && newVideoData.thumbnailUrl.trim()) {
+            // User provided a custom thumbnail URL
+            thumbnailUrl = newVideoData.thumbnailUrl;
+            console.log('Using custom thumbnail URL:', thumbnailUrl);
+          } else {
+            // Auto-generate thumbnail from video
+            if (uploadResult.thumbnail_url) {
+              thumbnailUrl = uploadResult.thumbnail_url;
+              console.log('Using Cloudinary auto-generated thumbnail:', thumbnailUrl);
+            } else {
+              // Fallback: Generate thumbnail from video using Cloudinary transformation
+              const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dazo6ypwt';
+              thumbnailUrl = `https://res.cloudinary.com/${cloudName}/video/upload/so_0,w_400,h_300,c_fill,q_auto,f_jpg/${uploadResult.public_id}.jpg`;
+              console.log('Generated fallback thumbnail URL:', thumbnailUrl);
+            }
+          }
+          
+          // Ensure thumbnail URL is not empty
+          if (!thumbnailUrl) {
+            const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dazo6ypwt';
+            thumbnailUrl = `https://res.cloudinary.com/${cloudName}/video/upload/so_0,w_400,h_300,c_fill,q_auto,f_jpg/${uploadResult.public_id}.jpg`;
+            console.warn('Thumbnail URL was empty, using default generation:', thumbnailUrl);
+          }
 
           const newVideo: Omit<ShortVideo, 'id'> = {
             title: newVideoData.title || file.name.replace(/\.[^/.]+$/, ""),
@@ -414,6 +448,9 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
               return acc;
             }, {}),
           };
+          
+          console.log('Creating video with data:', newVideo);
+          console.log('Final thumbnail URL:', newVideo.thumbnailUrl);
 
           await videosService.create(newVideo);
 
@@ -1207,6 +1244,79 @@ export default function VideoManagement({ darkMode, toggleDarkMode }: VideoManag
                     placeholder="suckhoe, dinhduong, thethanh"
                     helperText="Ví dụ: suckhoe, dinhduong, thethanh"
                   />
+                </Grid>
+
+                {/* Thumbnail Section */}
+                <Grid item xs={12}>
+                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2, mt: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Thumbnail (Không bắt buộc)
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                      <Button
+                        variant={newVideoData.thumbnailType === 'auto' ? 'contained' : 'outlined'}
+                        onClick={() => {
+                          setNewVideoData({ ...newVideoData, thumbnailType: 'auto', thumbnailUrl: '' });
+                          setThumbnailError('');
+                        }}
+                        size="small"
+                      >
+                        Tự động từ video
+                      </Button>
+                      <Button
+                        variant={newVideoData.thumbnailType === 'url' ? 'contained' : 'outlined'}
+                        onClick={() => setNewVideoData({ ...newVideoData, thumbnailType: 'url' })}
+                        size="small"
+                      >
+                        Nhập link ảnh
+                      </Button>
+                    </Box>
+
+                    {newVideoData.thumbnailType === 'auto' && (
+                      <Alert severity="info">
+                        Thumbnail sẽ tự động được tạo từ video khi upload lên
+                      </Alert>
+                    )}
+
+                    {newVideoData.thumbnailType === 'url' && (
+                      <Box>
+                        <TextField
+                          fullWidth
+                          label="Link ảnh thumbnail"
+                          value={newVideoData.thumbnailUrl}
+                          onChange={(e) => {
+                            setNewVideoData({ ...newVideoData, thumbnailUrl: e.target.value });
+                            setThumbnailError('');
+                          }}
+                          placeholder="https://example.com/thumbnail.jpg"
+                          error={!!thumbnailError}
+                          helperText={thumbnailError || 'Nhập link ảnh thumbnail cho video'}
+                        />
+                        
+                        {newVideoData.thumbnailUrl && !thumbnailError && (
+                          <Box sx={{ mt: 2 }}>
+                            <Typography variant="body2" gutterBottom>
+                              Preview:
+                            </Typography>
+                            <Box
+                              component="img"
+                              src={newVideoData.thumbnailUrl}
+                              alt="Thumbnail preview"
+                              sx={{
+                                maxWidth: 200,
+                                maxHeight: 150,
+                                borderRadius: 1,
+                                border: '1px solid',
+                                borderColor: 'divider'
+                              }}
+                              onError={() => setThumbnailError('Không thể tải ảnh từ link này')}
+                            />
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
                 </Grid>
               </Grid>
               

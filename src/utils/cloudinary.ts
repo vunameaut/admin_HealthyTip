@@ -23,8 +23,8 @@ export const getCloudinaryVideoUrl = (
 ): string => {
   if (!publicId) return '';
   
-  // Remove any existing cloudinary URLs if passed
-  const cleanPublicId = publicId.replace(/^.*\/([^/]+)$/, '$1').replace(/\.[^.]*$/, '');
+  // Keep full path but remove file extension if present
+  const cleanPublicId = publicId.replace(/\.[^.]*$/, '');
   
   const transformations = [];
   
@@ -47,7 +47,8 @@ export const generateVideoThumbnail = (
 ): string => {
   if (!publicId) return '';
   
-  const cleanPublicId = publicId.replace(/^.*\/([^/]+)$/, '$1').replace(/\.[^.]*$/, '');
+  // Keep the full path but remove file extension if present
+  const cleanPublicId = publicId.replace(/\.[^.]*$/, '');
   const transformations = [];
   
   // Default thumbnail options
@@ -71,7 +72,8 @@ export const generateImageUrl = (
 ): string => {
   if (!publicId) return '';
   
-  const cleanPublicId = publicId.replace(/^.*\/([^/]+)$/, '$1').replace(/\.[^.]*$/, '');
+  // Keep full path but remove file extension if present
+  const cleanPublicId = publicId.replace(/\.[^.]*$/, '');
   const transformations = [];
   
   if (options.width) transformations.push(`w_${options.width}`);
