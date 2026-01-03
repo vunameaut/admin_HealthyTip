@@ -326,8 +326,35 @@ export class VideosService {
 
   async delete(id: string): Promise<void> {
     try {
+      // Get video data first to retrieve cloudinary public_id
+      const video = await this.getById(id);
+      
+      // Delete from Firebase
       const videoRef = ref(database, `${this.basePath}/${id}`);
       await remove(videoRef);
+      
+      // Delete from Cloudinary if video has cloudinaryPublicId or cldPublicId
+      if (video && (video.cloudinaryPublicId || video.cldPublicId)) {
+        const publicId = video.cloudinaryPublicId || video.cldPublicId;
+        try {
+          const response = await fetch('/api/cloudinary/delete-video', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ publicId }),
+          });
+          
+          if (!response.ok) {
+            console.error('Failed to delete video from Cloudinary:', await response.json());
+          } else {
+            console.log('Video deleted from Cloudinary successfully');
+          }
+        } catch (cloudinaryError) {
+          console.error('Error calling Cloudinary delete API:', cloudinaryError);
+          // Continue anyway - Firebase deletion was successful
+        }
+      }
     } catch (error) {
       console.error('Error deleting video:', error);
       throw error;

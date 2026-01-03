@@ -39,13 +39,15 @@ import {
   Comment,
   PersonOff,
   Clear,
-  ThumbUpAlt
+  ThumbUpAlt,
+  Image
 } from '@mui/icons-material';
 import LayoutWrapper from '../../../components/LayoutWrapper';
 import AuthGuard from '../../../components/AuthGuard';
 import VideoPlayer from '../../../components/VideoPlayer';
+import MediaUploadForm from '../../../components/MediaUploadForm';
 import { videosService, categoriesService } from '../../../services/firebase';
-import { ShortVideo, Category } from '../../../types';
+import { ShortVideo, Category, Media } from '../../../types';
 import toast from 'react-hot-toast';
 
 // =================================================================
@@ -220,6 +222,13 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [userToBan, setUserToBan] = useState<string | null>(null);
   
+  // Thumbnail states
+  const [thumbnailType, setThumbnailType] = useState<'upload' | 'url' | 'auto'>('auto');
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [uploadedThumbnail, setUploadedThumbnail] = useState<Media | null>(null);
+  const [showThumbnailUpload, setShowThumbnailUpload] = useState(false);
+  const [thumbnailUrlError, setThumbnailUrlError] = useState('');
+  
   const [formData, setFormData] = useState({
     title: '',
     caption: '',
@@ -250,6 +259,18 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
           categoryId: videoData.categoryId,
           status: videoData.status
         });
+        
+        // Set current thumbnail
+        if (videoData.thumbnailUrl || videoData.thumb) {
+          const currentThumb = videoData.thumbnailUrl || videoData.thumb || '';
+          setThumbnailUrl(currentThumb);
+          // Check if it's auto-generated from Cloudinary
+          if (currentThumb && currentThumb.includes('cloudinary.com/video/upload/so_')) {
+            setThumbnailType('auto');
+          } else {
+            setThumbnailType('url');
+          }
+        }
       } else {
         toast.error('Video không tồn tại');
         router.push('/videos');
@@ -294,6 +315,9 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
         return;
       }
 
+      // Get final thumbnail URL
+      const finalThumbnailUrl = getThumbnailUrl();
+
       const updateData: Partial<ShortVideo> = {
         title: formData.title.trim(),
         caption: formData.caption.trim(),
@@ -301,6 +325,12 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
         status: formData.status,
         updatedAt: Date.now()
       };
+      
+      // Update thumbnail if changed
+      if (finalThumbnailUrl) {
+        updateData.thumbnailUrl = finalThumbnailUrl;
+        updateData.thumb = finalThumbnailUrl; // For compatibility
+      }
 
       await videosService.update(id as string, updateData);
       toast.success('Cập nhật video thành công!');
@@ -322,6 +352,76 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
       console.error('Error deleting video:', error);
       toast.error('Có lỗi khi xóa video');
     }
+  };
+  
+  const handleThumbnailUploadComplete = (media: Media[]) => {
+    const imageFile = media.find(m => m.type === 'image');
+    if (imageFile) {
+      setUploadedThumbnail(imageFile);
+      setShowThumbnailUpload(false);
+      setThumbnailType('upload');
+      toast.success('Thumbnail upload thành công!');
+    }
+  };
+
+  const validateThumbnailUrl = async (url: string): Promise<boolean> => {
+    if (!url.trim()) {
+      setThumbnailUrlError('');
+      return true;
+    }
+
+    try {
+      // Check if URL is valid format
+      new URL(url);
+      
+      // Try to load image to check if it exists
+      const img = document.createElement('img');
+      img.crossOrigin = 'anonymous';
+      
+      const loadPromise = new Promise<boolean>((resolve) => {
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+      });
+      
+      img.src = url;
+      const isValid = await loadPromise;
+      
+      if (!isValid) {
+        setThumbnailUrlError('Link ảnh không hợp lệ hoặc không thể truy cập');
+        return false;
+      }
+      
+      setThumbnailUrlError('');
+      return true;
+    } catch (error) {
+      setThumbnailUrlError('Link không hợp lệ');
+      return false;
+    }
+  };
+
+  const handleThumbnailUrlChange = async (url: string) => {
+    setThumbnailUrl(url);
+    if (url.trim()) {
+      await validateThumbnailUrl(url);
+    }
+  };
+
+  const getThumbnailUrl = (): string => {
+    if (thumbnailType === 'upload' && uploadedThumbnail) {
+      return uploadedThumbnail.secure_url;
+    } else if (thumbnailType === 'url' && thumbnailUrl.trim()) {
+      return thumbnailUrl;
+    } else if (thumbnailType === 'auto' && video && (video.cloudinaryPublicId || video.cldPublicId)) {
+      // Auto-generate thumbnail from video using Cloudinary
+      const publicId = video.cloudinaryPublicId || video.cldPublicId;
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dazo6ypwt';
+      const randomOffset = Math.floor(Math.random() * 5);
+      return `https://res.cloudinary.com/${cloudName}/video/upload/so_${randomOffset},w_400,h_300,c_fill,q_auto,f_jpg/${publicId}.jpg`;
+    } else if (video?.thumbnailUrl || video?.thumb) {
+      // Use existing thumbnail
+      return video.thumbnailUrl || video.thumb || '';
+    }
+    return '';
   };
 
   const getStatusColor = (status: string) => {
@@ -622,6 +722,160 @@ export default function EditVideoPage({ darkMode, toggleDarkMode }: EditVideoPag
                     
                     {saving && <LinearProgress />}
                   </Box>
+                </CardContent>
+              </Card>
+              
+              {/* Thumbnail Edit Card */}
+              <Card sx={{ mt: 2 }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    <Image sx={{ mr: 1, verticalAlign: 'middle' }} />
+                    Thumbnail Video
+                  </Typography>
+                  
+                  {/* Current Thumbnail Preview */}
+                  {(video.thumbnailUrl || video.thumb) && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Thumbnail hiện tại:
+                      </Typography>
+                      <Box
+                        component="img"
+                        src={video.thumbnailUrl || video.thumb}
+                        alt="Current thumbnail"
+                        sx={{
+                          width: '100%',
+                          maxWidth: 300,
+                          height: 'auto',
+                          borderRadius: 1,
+                          border: '1px solid',
+                          borderColor: 'divider'
+                        }}
+                      />
+                    </Box>
+                  )}
+                  
+                  {/* Thumbnail Type Selection */}
+                  <Typography variant="subtitle2" gutterBottom>
+                    Chọn cách cập nhật thumbnail:
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                    <Button
+                      variant={thumbnailType === 'auto' ? 'contained' : 'outlined'}
+                      onClick={() => setThumbnailType('auto')}
+                      size="small"
+                    >
+                      Tự động từ video
+                    </Button>
+                    <Button
+                      variant={thumbnailType === 'upload' ? 'contained' : 'outlined'}
+                      onClick={() => {
+                        setThumbnailType('upload');
+                        setShowThumbnailUpload(true);
+                      }}
+                      size="small"
+                    >
+                      Upload ảnh mới
+                    </Button>
+                    <Button
+                      variant={thumbnailType === 'url' ? 'contained' : 'outlined'}
+                      onClick={() => setThumbnailType('url')}
+                      size="small"
+                    >
+                      Nhập link
+                    </Button>
+                  </Box>
+
+                  {/* Upload Image Option */}
+                  {thumbnailType === 'upload' && (
+                    <Box>
+                      {!uploadedThumbnail ? (
+                        showThumbnailUpload && (
+                          <Box sx={{ mb: 2 }}>
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                              Upload ảnh mới làm thumbnail. Định dạng: JPG, PNG, WebP
+                            </Alert>
+                            <MediaUploadForm
+                              onUploadComplete={handleThumbnailUploadComplete}
+                              allowMultiple={false}
+                            />
+                          </Box>
+                        )
+                      ) : (
+                        <Box>
+                          <Typography variant="subtitle2" gutterBottom>
+                            Thumbnail mới:
+                          </Typography>
+                          <Box
+                            component="img"
+                            src={uploadedThumbnail.secure_url}
+                            alt="New thumbnail"
+                            sx={{
+                              width: '100%',
+                              maxWidth: 300,
+                              height: 'auto',
+                              borderRadius: 1
+                            }}
+                          />
+                          <Button
+                            color="error"
+                            size="small"
+                            onClick={() => {
+                              setUploadedThumbnail(null);
+                              setShowThumbnailUpload(false);
+                              setThumbnailType('auto');
+                            }}
+                            sx={{ mt: 1 }}
+                          >
+                            Xóa
+                          </Button>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
+                  {/* URL Input Option */}
+                  {thumbnailType === 'url' && (
+                    <Box>
+                      <TextField
+                        label="Link ảnh thumbnail"
+                        value={thumbnailUrl}
+                        onChange={(e) => handleThumbnailUrlChange(e.target.value)}
+                        fullWidth
+                        placeholder="https://example.com/thumbnail.jpg"
+                        error={!!thumbnailUrlError}
+                        helperText={thumbnailUrlError || 'Nhập link ảnh thumbnail mới'}
+                        sx={{ mb: 2 }}
+                      />
+                      
+                      {thumbnailUrl && !thumbnailUrlError && (
+                        <Box>
+                          <Typography variant="subtitle2" gutterBottom>
+                            Preview:
+                          </Typography>
+                          <Box
+                            component="img"
+                            src={thumbnailUrl}
+                            alt="Thumbnail preview"
+                            sx={{
+                              width: '100%',
+                              maxWidth: 300,
+                              height: 'auto',
+                              borderRadius: 1
+                            }}
+                            onError={() => setThumbnailUrlError('Không thể tải ảnh từ link này')}
+                          />
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                  
+                  {/* Auto thumbnail info */}
+                  {thumbnailType === 'auto' && (
+                    <Alert severity="info">
+                      Thumbnail sẽ được tự động tạo từ video khi lưu thay đổi
+                    </Alert>
+                  )}
                 </CardContent>
               </Card>
             </Grid>

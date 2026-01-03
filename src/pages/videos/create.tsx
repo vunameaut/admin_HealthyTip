@@ -96,8 +96,9 @@ export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVide
 
     // Validate thumbnail
     const finalThumbnailUrl = getThumbnailUrl();
-    if (!finalThumbnailUrl) {
-      toast.error('Vui lòng thêm thumbnail cho video (upload ảnh hoặc nhập link)');
+    // Thumbnail is optional now - will auto-generate from video if not provided
+    if (!finalThumbnailUrl && !uploadedVideo) {
+      toast.error('Vui lòng upload video');
       return;
     }
 
@@ -250,6 +251,13 @@ export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVide
       return uploadedThumbnail.secure_url;
     } else if (thumbnailType === 'url' && thumbnailUrl.trim()) {
       return thumbnailUrl;
+    } else if (uploadedVideo?.public_id) {
+      // Auto-generate thumbnail from video using Cloudinary
+      const publicId = uploadedVideo.public_id;
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dazo6ypwt';
+      // Generate thumbnail from video at 0 seconds with random offset
+      const randomOffset = Math.floor(Math.random() * 5); // Random 0-5 seconds
+      return `https://res.cloudinary.com/${cloudName}/video/upload/so_${randomOffset},w_400,h_300,c_fill,q_auto,f_jpg/${publicId}.jpg`;
     } else if (uploadedVideo?.thumbnail_url) {
       // Fallback to video thumbnail if available
       return uploadedVideo.thumbnail_url;
@@ -314,7 +322,12 @@ export default function CreateVideoPage({ darkMode, toggleDarkMode }: CreateVide
                 {/* Thumbnail Card - Always show */}
                 <Card>
                   <CardContent>
-                    <Typography variant="h6" gutterBottom>Thumbnail Video</Typography>
+                    <Typography variant="h6" gutterBottom>
+                      Thumbnail Video
+                      <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                        (Không bắt buộc - sẽ tự động lấy từ video)
+                      </Typography>
+                    </Typography>
                     
                     {/* Thumbnail Type Selection */}
                     <FormControl component="fieldset" sx={{ mb: 2 }}>
