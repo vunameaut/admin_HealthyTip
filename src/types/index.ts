@@ -190,16 +190,38 @@ export interface AdminRole {
 // Additional types based on Firebase data structure
 export interface FirebaseAnalytics {
   id: string;
-  type: 'user_login' | 'page_view' | 'content_view' | 'search' | 'interaction';
-  data: {
-    userId?: string;
-    section?: string;
-    contentId?: string;
-    query?: string;
-  };
+  type: 'user_login' | 'page_view' | 'content_view' | 'video_view' | 'search' | 'favorite_add' | 'favorite_remove' | 'reminder_set' | 'notification_open' | 'interaction';
+  userId: string;
   timestamp: number;
-  userId?: string;
   userAgent?: string;
+  data?: {
+    // Page view data
+    page?: string;
+    
+    // Content view data
+    contentId?: string;
+    contentTitle?: string;
+    categoryId?: string;
+    
+    // Video view data
+    videoId?: string;
+    videoTitle?: string;
+    
+    // Search data
+    query?: string;
+    searchType?: string;
+    
+    // Reminder data
+    reminderId?: string;
+    reminderType?: string;
+    
+    // Notification data
+    notificationId?: string;
+    notificationType?: string;
+    
+    // Legacy fields for backward compatibility
+    section?: string;
+  };
   ip?: string;
 }
 

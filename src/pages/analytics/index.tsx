@@ -401,6 +401,26 @@ export default function Analytics({ darkMode, toggleDarkMode }: AnalyticsProps) 
 
           {loading && <LinearProgress sx={{ mb: 2 }} />}
 
+          {/* No Data Alert */}
+          {!loading && analyticsData.totalEvents === 0 && (
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              <Typography variant="body1" fontWeight="bold" gutterBottom>
+                Chưa có dữ liệu phân tích
+              </Typography>
+              <Typography variant="body2">
+                Hiện tại chưa có dữ liệu analytics trong hệ thống. Dữ liệu sẽ được thu thập tự động khi:
+              </Typography>
+              <Box component="ul" sx={{ mt: 1, mb: 0 }}>
+                <li>Người dùng đăng nhập vào ứng dụng</li>
+                <li>Người dùng xem nội dung (bài viết, video)</li>
+                <li>Người dùng tương tác với các tính năng trong ứng dụng</li>
+              </Box>
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Bạn có thể tạo dữ liệu mẫu bằng cách sử dụng ứng dụng di động hoặc chạy script tạo dữ liệu thử nghiệm.
+              </Typography>
+            </Alert>
+          )}
+
           {/* Stats Cards */}
           <Grid container spacing={3} mb={4}>
             {statCards.map((stat, index) => (
@@ -444,25 +464,32 @@ export default function Analytics({ darkMode, toggleDarkMode }: AnalyticsProps) 
                   <Typography variant="h6" gutterBottom>
                     Hoạt động người dùng theo thời gian
                   </Typography>
-                  <Box height={400}>
-                    <Line 
-                      data={getActivityChartData()} 
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'top'
+                  {analyticsData.userActivity.length > 0 ? (
+                    <Box height={400}>
+                      <Line 
+                        data={getActivityChartData()} 
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top'
+                            }
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true
+                            }
                           }
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true
-                          }
-                        }
-                      }}
-                    />
-                  </Box>
+                        }}
+                      />
+                    </Box>
+                  ) : (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      Chưa có dữ liệu hoạt động trong khoảng thời gian này.
+                      Dữ liệu sẽ được thu thập khi người dùng sử dụng ứng dụng.
+                    </Alert>
+                  )}
                 </Box>
               )}
 
@@ -472,112 +499,139 @@ export default function Analytics({ darkMode, toggleDarkMode }: AnalyticsProps) 
                   <Typography variant="h6" gutterBottom>
                     Nội dung được xem nhiều nhất
                   </Typography>
-                  <TableContainer component={Paper}>
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Thứ hạng</TableCell>
-                          <TableCell>Tiêu đề</TableCell>
-                          <TableCell align="right">Lượt xem</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {analyticsData.topContent.map((content, index) => (
-                          <TableRow key={content.id}>
-                            <TableCell>
-                              <Chip 
-                                label={index + 1} 
-                                color={index < 3 ? 'primary' : 'default'}
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>{content.title}</TableCell>
-                            <TableCell align="right">{content.views}</TableCell>
+                  {analyticsData.topContent.length > 0 ? (
+                    <TableContainer component={Paper}>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Thứ hạng</TableCell>
+                            <TableCell>Tiêu đề</TableCell>
+                            <TableCell align="right">Lượt xem</TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                        </TableHead>
+                        <TableBody>
+                          {analyticsData.topContent.map((content, index) => (
+                            <TableRow key={content.id}>
+                              <TableCell>
+                                <Chip 
+                                  label={index + 1} 
+                                  color={index < 3 ? 'primary' : 'default'}
+                                  size="small"
+                                />
+                              </TableCell>
+                              <TableCell>{content.title}</TableCell>
+                              <TableCell align="right">{content.views}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      Chưa có dữ liệu xem nội dung trong khoảng thời gian này. 
+                      Dữ liệu sẽ được thu thập khi người dùng xem nội dung trong ứng dụng.
+                    </Alert>
+                  )}
                 </Box>
               )}
 
               {/* Category Analytics Tab */}
               {tabValue === 2 && (
                 <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="h6" gutterBottom>
-                      Phân bố nội dung theo danh mục
-                    </Typography>
-                    <Box height={300}>
-                      <Doughnut 
-                        data={getCategoryChartData()} 
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: {
-                              position: 'right'
-                            }
-                          }
-                        }}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="h6" gutterBottom>
-                      Chi tiết danh mục
-                    </Typography>
-                    <List>
-                      {analyticsData.categoryStats.map((stat, index) => (
-                        <ListItem key={index}>
-                          <ListItemText
-                            primary={stat.name}
-                            secondary={`${stat.count} bài viết`}
+                  {analyticsData.categoryStats.length > 0 ? (
+                    <>
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="h6" gutterBottom>
+                          Phân bố nội dung theo danh mục
+                        </Typography>
+                        <Box height={300}>
+                          <Doughnut 
+                            data={getCategoryChartData()} 
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  position: 'right'
+                                }
+                              }
+                            }}
                           />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Grid>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="h6" gutterBottom>
+                          Chi tiết danh mục
+                        </Typography>
+                        <List>
+                          {analyticsData.categoryStats.map((stat, index) => (
+                            <ListItem key={index}>
+                              <ListItemText
+                                primary={stat.name}
+                                secondary={`${stat.count} bài viết`}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Grid>
+                    </>
+                  ) : (
+                    <Grid item xs={12}>
+                      <Alert severity="info">
+                        Chưa có danh mục hoặc nội dung nào. Vui lòng tạo danh mục và thêm nội dung để xem phân tích.
+                      </Alert>
+                    </Grid>
+                  )}
                 </Grid>
               )}
 
               {/* Device Analytics Tab */}
               {tabValue === 3 && (
                 <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="h6" gutterBottom>
-                      Phân bố thiết bị truy cập
-                    </Typography>
-                    <Box height={300}>
-                      <Pie 
-                        data={getDeviceChartData()} 
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: {
-                              position: 'bottom'
-                            }
-                          }
-                        }}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="h6" gutterBottom>
-                      Chi tiết thiết bị
-                    </Typography>
-                    <List>
-                      {analyticsData.deviceStats.map((stat, index) => (
-                        <ListItem key={index}>
-                          <ListItemText
-                            primary={stat.device}
-                            secondary={`${stat.count} lượt truy cập (${((stat.count / analyticsData.totalEvents) * 100).toFixed(1)}%)`}
+                  {analyticsData.deviceStats.length > 0 ? (
+                    <>
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="h6" gutterBottom>
+                          Phân bố thiết bị truy cập
+                        </Typography>
+                        <Box height={300}>
+                          <Pie 
+                            data={getDeviceChartData()} 
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  position: 'bottom'
+                                }
+                              }
+                            }}
                           />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Grid>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="h6" gutterBottom>
+                          Chi tiết thiết bị
+                        </Typography>
+                        <List>
+                          {analyticsData.deviceStats.map((stat, index) => (
+                            <ListItem key={index}>
+                              <ListItemText
+                                primary={stat.device}
+                                secondary={`${stat.count} lượt truy cập (${((stat.count / analyticsData.totalEvents) * 100).toFixed(1)}%)`}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Grid>
+                    </>
+                  ) : (
+                    <Grid item xs={12}>
+                      <Alert severity="info">
+                        Chưa có dữ liệu thiết bị. Dữ liệu sẽ được thu thập khi người dùng truy cập từ ứng dụng.
+                      </Alert>
+                    </Grid>
+                  )}
                 </Grid>
               )}
             </CardContent>

@@ -118,13 +118,6 @@ export default function ReportDetailPage() {
       setLoading(false);
       if (snapshot.exists()) {
         setReport({ id: snapshot.key!, ...snapshot.val() });
-        
-        // ✅ Đánh dấu đã đọc tin nhắn từ user khi admin mở report
-        if (snapshot.val().hasUnreadUserMessage) {
-          update(reportRef, {
-            hasUnreadUserMessage: false,
-          }).catch(err => console.error('Error clearing unread flag:', err));
-        }
       } else {
         setError('Không tìm thấy báo cáo');
       }
@@ -439,8 +432,13 @@ export default function ReportDetailPage() {
                           maxWidth: '70%',
                           p: 1.5,
                           borderRadius: 2,
-                          bgcolor: msg.senderType === 'admin' ? 'primary.main' : 'grey.100',
+                          bgcolor: msg.senderType === 'admin' ? 'primary.main' : 'grey.200',
                           color: msg.senderType === 'admin' ? 'white' : 'text.primary',
+                          ...(msg.senderType !== 'admin' && {
+                            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'grey.700' : 'grey.200',
+                            border: (theme) => theme.palette.mode === 'dark' ? '1px solid' : 'none',
+                            borderColor: (theme) => theme.palette.mode === 'dark' ? 'grey.600' : 'transparent',
+                          }),
                         }}
                       >
                         {msg.imageUrl && (
