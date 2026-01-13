@@ -76,12 +76,13 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
   const [bulkActionMenuAnchor, setBulkActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [filters, setFilters] = useState<FilterOptions>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState('title-asc');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState<HealthTip | null>(null);
 
   useEffect(() => {
     loadData();
-  }, [filters, searchQuery]);
+  }, [filters, searchQuery, sortOption]);
 
   const loadData = async () => {
     try {
@@ -104,6 +105,21 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
                  contentString.toLowerCase().includes(searchQuery.toLowerCase());
         });
       }
+
+      filteredTips.sort((a, b) => {
+        switch (sortOption) {
+          case 'title-asc':
+            return a.title.localeCompare(b.title);
+          case 'title-desc':
+            return b.title.localeCompare(a.title);
+          case 'date-newest':
+            return b.createdAt - a.createdAt;
+          case 'date-oldest':
+            return a.createdAt - b.createdAt;
+          default:
+            return 0;
+        }
+      });
       
       setHealthTips(filteredTips);
       setCategories(cats);
@@ -449,6 +465,21 @@ export default function ContentManagement({ darkMode, toggleDarkMode }: ContentM
                       startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
                     }}
                   />
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <FormControl fullWidth>
+                    <InputLabel>Sắp xếp</InputLabel>
+                    <Select
+                      value={sortOption}
+                      onChange={(e) => setSortOption(e.target.value)}
+                      label="Sắp xếp"
+                    >
+                      <MenuItem value="title-asc">Tên (A-Z)</MenuItem>
+                      <MenuItem value="title-desc">Tên (Z-A)</MenuItem>
+                      <MenuItem value="date-newest">Mới nhất</MenuItem>
+                      <MenuItem value="date-oldest">Cũ nhất</MenuItem>
+                    </Select>
+                  </FormControl>
                 </Grid>
                 <Grid item xs={12} md={2}>
                   <FormControl fullWidth>
